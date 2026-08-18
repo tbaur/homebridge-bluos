@@ -14,6 +14,11 @@ updates:
     commit-message:
       prefix: "chore"
       prefix-development: "chore"
+    ignore:
+      # TypeScript 7.0 dropped the compiler API that typescript-eslint 8 and
+      # ts-jest still import. Language-identical to 6; stay until 7.1.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       # Batch only low-risk patch/minor development updates so they stay
       # auto-mergeable. Major bumps (e.g. eslint, jest, typescript, homebridge
