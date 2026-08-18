@@ -1,6 +1,6 @@
 # Releasing
 
-Releases are fully automated with [release-please](https://github.com/googleapis/release-please). Versions, `CHANGELOG.md`, git tags, GitHub Releases, and `npm publish` are all derived from commit messages — none are edited or run by hand.
+Releases are automated with [release-please](https://github.com/googleapis/release-please). Versions, `CHANGELOG.md`, git tags, GitHub Releases, and `npm publish` are all derived from commit messages — none are edited or run by hand.
 
 ## Flow
 
@@ -39,19 +39,21 @@ An accessory-affecting release deserves a note in the changelog body, not just a
 
 ## Publishing authentication
 
-Publishing uses **npm Trusted Publishing (OIDC)** — there is no `NPM_TOKEN` secret. The package must be linked to this repo's `release.yml` workflow on npmjs.com:
+Publishing uses **npm Trusted Publishing (OIDC)** — there is no `NPM_TOKEN` secret. The package is linked to this repo's `release.yml` workflow on npmjs.com:
 
 - Package → **Settings → Trusted Publisher** (Publishing access)
 - GitHub Actions publisher: organization/user `tbaur`, repository `homebridge-bluos`, workflow `release.yml`, no environment.
 
-This link only needs to exist before the first Release PR is merged; it does not need to be reconfigured per release. The package can still be unpublished when you create the publisher — do not `npm publish` by hand just to wire it up.
+That link is not reconfigured per release. `0.1.0` was published by hand so the publisher could be attached; every later version (starting with `0.1.1`) is published by the Release workflow.
 
-The `## Unreleased` stub in `CHANGELOG.md` is a placeholder. The first Release PR writes the dated version section from Conventional Commit titles; drop the stub when you review that PR. Because `.release-please-manifest.json` already lists `0.1.0`, that first automated release is **0.1.1** unless you set the manifest to `0.0.0` first.
+GitHub Actions must be allowed to create pull requests (Settings → Actions → General → Workflow permissions). Without that, release-please writes the release branch but cannot open the PR. The job already requests `contents: write` and `pull-requests: write`; the repo toggle is what permits `GITHUB_TOKEN` to use them for PRs.
+
+A `PUT` 404 on a name that does not exist yet is npm treating you as anonymous. Classic `npm_` tokens were revoked in December 2025; a live `npm login` session (2FA) or a granular token with **Read and write**, **All packages**, and **Bypass 2FA** is what creates a new name. That is how `0.1.0` was cut, not how later versions ship.
 
 ## Notes
 
 - **PR titles drive releases.** With squash merges, the PR title becomes the commit release-please reads. `chore:`/`docs:`/`ci:` titles intentionally produce no release.
-- **The Release PR does not re-run the Tests workflow.** GitHub does not trigger workflows for PRs opened by the built-in token (loop prevention). The code was already tested on its own PR, and the `publish` job builds, lints, and tests again before publishing, so nothing ships untested.
+- **The Release PR does not re-run the Tests workflow.** GitHub does not trigger workflows for PRs opened by the built-in token (loop prevention), so those checks sit at `action_required`. The code was already tested on `main`, and the `publish` job builds, lints, and tests again before publishing, so nothing ships untested.
 - **Version source of truth** is `.release-please-manifest.json`. The `package.json` version is owned by release-please and is not hand-edited.
 - Behavior is configured in `release-please-config.json`.
 
