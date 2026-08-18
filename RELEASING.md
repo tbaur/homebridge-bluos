@@ -27,6 +27,14 @@ A release therefore reduces to: merge the code PR(s), then merge the Release PR.
 
 An accessory-affecting release deserves a note in the changelog body, not just a version bump: anything that changes an accessory's identity re-creates it in HomeKit and costs the user its room and automations. Prefer adopting over re-keying, and say so in the PR description when it cannot be avoided.
 
+## Before merging a Release PR
+
+**Read its diff.** A healthy Release PR changes exactly three things: the `version` in `package.json` (plus its echo in `package-lock.json`), `CHANGELOG.md`, and `.release-please-manifest.json`. Anything else means the release branch was cut before some of the commits it is releasing, and merging it will *undo* them.
+
+That happened at 0.1.1: commit [`159c7d9`](https://github.com/tbaur/homebridge-bluos/commit/159c7d9a5385e33607714fb8df79c5eb6363ae04) reverted the `@homebridge/plugin-ui-utils` and `@types/node` bumps that had merged after its branch was created. Dependabot raised both again, they merged after 1.0.0 was tagged, and the published 1.0.0 tarball consequently still depends on `@homebridge/plugin-ui-utils` 2.2.4.
+
+If the diff is wrong, do not fix it in place — close the Release PR and delete its `release-please--branches--main` branch. The next push to `main`, or a manual run of the release workflow, opens a fresh one from current `main`.
+
 ## Branch protection
 
 `main` is protected with settings chosen to be compatible with the automated flow above:
@@ -53,6 +61,7 @@ A `PUT` 404 on a name that does not exist yet is npm treating you as anonymous. 
 ## Notes
 
 - **PR titles drive releases.** With squash merges, the PR title becomes the commit release-please reads. `chore:`/`docs:`/`ci:` titles intentionally produce no release.
+- **Dependency bumps.** Dependabot titles runtime bumps `fix:` and development bumps `chore:` (see `.github/dependabot.yml`), so a dependency that users install cuts a patch release on its own, while a lint or test dependency waits for the next release to carry it. A runtime bump left as `chore:` reaches nobody until unrelated work happens to ship it.
 - **The Release PR does not re-run the Tests workflow.** GitHub does not trigger workflows for PRs opened by the built-in token (loop prevention), so those checks sit at `action_required`. The code was already tested on `main`, and the `publish` job builds, lints, and tests again before publishing, so nothing ships untested.
 - **Version source of truth** is `.release-please-manifest.json`. The `package.json` version is owned by release-please and is not hand-edited.
 - Behavior is configured in `release-please-config.json`.
