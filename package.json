@@ -59,7 +59,7 @@
     "homebridge": "^2.1.0",
     "jest": "^30.4.2",
     "ts-jest": "29.4.12",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "homebridge": "^1.6.0 || ^2.0.0",
