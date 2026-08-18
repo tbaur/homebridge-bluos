@@ -29,7 +29,7 @@ A checklist of what is built. The plugin aims to cover everything about a BluOS 
 - ✅ The pair of writes HomeKit sends when a slider leaves zero is coalesced into one command
 - ✅ Set/poll race protection with a generation counter, so a slider never springs back
 - ✅ A deliberately cancelled poll is not counted as a failure
-- ✅ Exponential backoff to a one-minute ceiling for an unreachable player; the first failure warns, the rest go to debug
+- ✅ Exponential backoff to a one-minute ceiling for an unreachable player; a lone failure logs at debug, the warning waits for the third missed poll that turns the tile to No Response, repeats hourly at most, and is answered by a recovery line
 - ✅ Automatic address re-resolution after repeated failures, rate-limited, so a DHCP lease change needs no user action
 - ✅ New addresses persisted into the accessory cache so they survive a restart
 - ✅ Accessory identity is `MAC:port:kind` (plus the preset level), never the address, so an IP change keeps your accessories
