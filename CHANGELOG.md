@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/tbaur/homebridge-bluos/compare/v1.0.0...v1.0.1) (2026-08-18)
+
+
+### Bug Fixes
+
+* **deps:** hold @types/node at the Node 20 floor and ship the pending UI utils bump ([b2f4be3](https://github.com/tbaur/homebridge-bluos/commit/b2f4be3e9caa5d6fa8736c4ee2c5cd9a42cfeb1a))
+
 ## [1.0.0](https://github.com/tbaur/homebridge-bluos/compare/v0.1.1...v1.0.0) (2026-08-18)
 
 First stable release. Volume, mute, volume presets, and battery for each discovered BluOS player, keyed to the player's MAC address so a new DHCP lease keeps the accessory — and with it the room and automations you attached to it. See [README.md](README.md) for what each accessory does and [docs/FEATURES.md](docs/FEATURES.md) for what is planned next.
