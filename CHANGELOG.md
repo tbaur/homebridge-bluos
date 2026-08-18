@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/tbaur/homebridge-bluos/compare/v1.0.2...v1.0.3) (2026-08-18)
+
+
+### Miscellaneous Chores
+
+* release 1.0.3 ([c069e0f](https://github.com/tbaur/homebridge-bluos/commit/c069e0fab32b2d4615d70d0651c348026db479b0))
+
 ## [1.0.2](https://github.com/tbaur/homebridge-bluos/compare/v1.0.1...v1.0.2) (2026-08-18)
 
 
