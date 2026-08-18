@@ -1,7 +1,7 @@
 {
   "name": "homebridge-bluos",
   "displayName": "Homebridge BluOS",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Homebridge plugin for BluOS players — per-zone volume, mute, volume-preset and battery accessories over the LAN Custom Integration API. Verified on NAD and Bluesound hardware",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -44,14 +44,14 @@
     "brace-expansion": "^5.0.9"
   },
   "dependencies": {
-    "@homebridge/plugin-ui-utils": "2.2.5",
+    "@homebridge/plugin-ui-utils": "2.2.4",
     "multicast-dns": "7.2.5"
   },
   "devDependencies": {
     "@types/dns-packet": "^5.6.5",
     "@types/jest": "^30.0.0",
     "@types/multicast-dns": "^7.2.4",
-    "@types/node": "^26.2.0",
+    "@types/node": "^20.19.43",
     "@typescript-eslint/eslint-plugin": "^8.51.0",
     "@typescript-eslint/parser": "^8.51.0",
     "eslint": "^10.6.0",
