@@ -53,6 +53,12 @@ class BaseAccessory {
     }
     /** Apply a fresh observation, and remember that state is now known. */
     applyObservation(observation, reason) {
+        if (this.offline) {
+            // Every outage warns on its way in, so it gets a matching line on its way
+            // out: without one, a log shows a player failing and never recovering, and
+            // an outage that healed reads exactly like one still in progress.
+            this.host.log.info(`${(0, utils_1.forLog)(this.displayName)} [${(0, utils_1.forLog)(this.deviceId)}] is responding again`);
+        }
         this.offline = false;
         this.observed = true;
         this.lastWarningAt = 0;

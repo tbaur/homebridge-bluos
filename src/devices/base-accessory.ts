@@ -85,6 +85,14 @@ export abstract class BaseAccessory implements RefreshableAccessory {
 
   /** Apply a fresh observation, and remember that state is now known. */
   applyObservation(observation: PlayerObservation, reason: RefreshReason): void {
+    if (this.offline) {
+      // Every outage warns on its way in, so it gets a matching line on its way
+      // out: without one, a log shows a player failing and never recovering, and
+      // an outage that healed reads exactly like one still in progress.
+      this.host.log.info(
+        `${forLog(this.displayName)} [${forLog(this.deviceId)}] is responding again`,
+      )
+    }
     this.offline = false
     this.observed = true
     this.lastWarningAt = 0

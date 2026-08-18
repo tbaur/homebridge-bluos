@@ -26,7 +26,7 @@ What stays in the BluOS app is the part HomeKit has no vocabulary for: browsing,
 - **Long-polling, not polling** — `/SyncStatus?timeout=100` with an `etag`, so a change made on the front panel, the remote or the BluOS app reaches HomeKit in about a second, without hammering the player
 - **Follows the API's rate rules** — One second minimum between two requests for the same resource, per the BluOS specification; writes to one chassis are serialised, and separate chassis stay parallel
 - **Survives a DHCP lease change** — Accessory identity is the player's MAC and zone port, never its address. If a player moves, the plugin re-resolves it and remembers the new address
-- **Backs off when a player is off** — Exponential delay to a one-minute ceiling instead of dialling an absent player every second; the first failure warns, the rest go to debug
+- **Backs off when a player is off** — Exponential delay to a one-minute ceiling instead of dialling an absent player every second. A single failure is a debug line; the warning comes when the player has missed three polls and HomeKit is told No Response, then at most hourly while it stays away, with one line when it answers again
 - **Answers HomeKit promptly** — A write returns inside HAP's patience window and finishes anything slower in the background, where the result still reaches HomeKit through the next poll
 - **No volume jumps** — The pair of writes HomeKit sends when a slider leaves zero is coalesced into one command
 - **Honest state** — An accessory reports No Response until the player has actually been read, and again once it stops answering, rather than showing a value it cannot confirm

@@ -214,6 +214,28 @@ describe('shared accessory behaviour', () => {
       expect(test.log.calls.filter((line) => line.startsWith('warn'))).toHaveLength(2)
     })
 
+    it('says so when the player answers again, so an outage can be seen to have ended', () => {
+      const test = harness()
+      const accessory = new VolumeAccessory(test)
+      accessory.noteUnreachable(new Error('host is down'))
+
+      accessory.applyObservation(observation(), 'poll')
+
+      const recovered = test.log.calls.filter((line) => line.includes('is responding again'))
+      expect(recovered).toHaveLength(1)
+      expect(recovered[0]).toContain('info')
+    })
+
+    it('says nothing about recovery while the player keeps answering', () => {
+      const test = harness()
+      const accessory = new VolumeAccessory(test)
+
+      accessory.applyObservation(observation(), 'startup')
+      accessory.applyObservation(observation({ volume: 20 }), 'poll')
+
+      expect(test.log.calls.filter((line) => line.includes('is responding again'))).toHaveLength(0)
+    })
+
     it('refuses reads again after going unreachable, rather than reporting stale state', () => {
       const test = harness()
       const accessory = new VolumeAccessory(test)
