@@ -2,6 +2,7 @@
 
 ## [1.0.0](https://github.com/tbaur/homebridge-bluos/compare/v0.1.1...v1.0.0) (2026-08-18)
 
+First stable release. Volume, mute, volume presets, and battery for each discovered BluOS player, keyed to the player's MAC address so a new DHCP lease keeps the accessory — and with it the room and automations you attached to it. See [README.md](README.md) for what each accessory does and [docs/FEATURES.md](docs/FEATURES.md) for what is planned next.
 
 ### Miscellaneous Chores
 
@@ -14,10 +15,6 @@
 
 * BluOS players in HomeKit, verified against real hardware ([643e029](https://github.com/tbaur/homebridge-bluos/commit/643e0298c127e9df92dc42841896c5844162f1ec))
 
-## Changelog
+## 0.1.0 (2026-08-18)
 
-All notable changes to this project are documented in this file. This file is maintained automatically by [release-please](https://github.com/googleapis/release-please) based on [Conventional Commits](https://www.conventionalcommits.org).
-
-## Unreleased
-
-* initial BluOS plugin
+Published by hand to create the package name so an npm trusted publisher could be attached to it; see [RELEASING.md](RELEASING.md). Functionally identical to 0.1.1, which is the first version the release workflow published.

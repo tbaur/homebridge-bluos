@@ -33,7 +33,7 @@ A capability ships if HomeKit can express it as a tile, a scene, an automation o
 
 ## Commands
 
-Node 20+, matching `engines`. CI runs 20 / 22 / 24, a Homebridge 1.6 floor job, and a runtime `npm audit`.
+Node 20+, matching `engines`. CI runs 20 / 22 / 24, a Homebridge 1.6 floor job, and a runtime `npm audit`. `@types/node` stays on the 20 line for the same reason: newer types let the compiler accept API that the oldest supported runtime does not have. Dependabot is told not to raise it — the floor and the types move together, deliberately.
 
 ```bash
 npm install
