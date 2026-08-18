@@ -33,7 +33,7 @@ An accessory-affecting release deserves a note in the changelog body, not just a
 
 That happened at 0.1.1: commit [`159c7d9`](https://github.com/tbaur/homebridge-bluos/commit/159c7d9a5385e33607714fb8df79c5eb6363ae04) reverted the `@homebridge/plugin-ui-utils` and `@types/node` bumps that had merged after its branch was created. Dependabot raised both again, they merged after 1.0.0 was tagged, and the published 1.0.0 tarball consequently still depends on `@homebridge/plugin-ui-utils` 2.2.4.
 
-If the diff is wrong, do not fix it in place — close the Release PR and delete its `release-please--branches--main` branch. The next push to `main`, or a manual run of the release workflow, opens a fresh one from current `main`.
+If the diff is wrong, do not fix it in place — close the Release PR and delete its branch (`release-please--branches--main--components--homebridge-bluos`). The next push to `main`, or a manual run of the release workflow, opens a fresh one from current `main`.
 
 ## Branch protection
 
