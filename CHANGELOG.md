@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/tbaur/homebridge-bluos/compare/v1.0.1...v1.0.2) (2026-08-18)
+
+
+### Bug Fixes
+
+* log when a player answers again after an outage ([7e26d9d](https://github.com/tbaur/homebridge-bluos/commit/7e26d9d449d36282d2aeb829cb436380520e3882))
+
 ## [1.0.1](https://github.com/tbaur/homebridge-bluos/compare/v1.0.0...v1.0.1) (2026-08-18)
 
 
