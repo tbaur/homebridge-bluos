@@ -1,0 +1,66 @@
+# Releasing
+
+Releases are fully automated with [release-please](https://github.com/googleapis/release-please). Versions, `CHANGELOG.md`, git tags, GitHub Releases, and `npm publish` are all derived from commit messages — none are edited or run by hand.
+
+## Flow
+
+1. A branch is created and changes are committed. `npm run build` output under `dist/` is committed with the source, because CI fails if the two have drifted.
+2. A PR is opened with a **Conventional Commit title**. The title determines the next version when the PR is squash-merged into `main`:
+
+   | PR title prefix | Example | Version bump |
+   |---|---|---|
+   | `fix:` | `fix: treat level zero as unmuted` | patch (0.1.0 → 0.1.1) |
+   | `feat:` | `feat: add battery accessory` | patch while pre-1.0 (0.1.0 → 0.1.1); minor once 1.x (1.0.0 → 1.1.0) |
+   | `feat!:` / `fix!:` or a `BREAKING CHANGE:` footer | `feat!: drop Node 20` | minor while pre-1.0 (0.1.0 → 0.2.0); major once 1.x (1.0.0 → 2.0.0) |
+   | `chore:`, `docs:`, `refactor:`, `test:`, `ci:` | `docs: fix typo` | no release |
+
+   Pre-1.0 bumps are damped by `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` in `release-please-config.json`; the parenthesized 1.x behavior applies automatically once the first 1.0.0 is cut.
+
+3. The **Tests** workflow runs on the PR (matrix: Node 20, 22, 24, plus a Homebridge 1.6 floor job and an `npm audit` security job), alongside the **OSV-Scanner** workflow's PR scan. The PR is squash-merged to `main`.
+4. **release-please** opens or updates a **Release PR** titled `chore(main): release X.Y.Z`. It carries the version bump in `package.json` and the generated `CHANGELOG.md` entries. Multiple code PRs merged before a release are batched into one Release PR.
+5. Merging the Release PR triggers the `release.yml` workflow, which:
+   - creates the `vX.Y.Z` git tag,
+   - publishes a GitHub Release with the changelog notes,
+   - runs the `publish` job (install with `--ignore-scripts` → build → lint → test → `npm publish --dry-run` → `npm publish` with provenance and `--access public`) on Node 24.
+
+A release therefore reduces to: merge the code PR(s), then merge the Release PR.
+
+An accessory-affecting release deserves a note in the changelog body, not just a version bump: anything that changes an accessory's identity re-creates it in HomeKit and costs the user its room and automations. Prefer adopting over re-keying, and say so in the PR description when it cannot be avoided.
+
+## Branch protection
+
+`main` is protected with settings chosen to be compatible with the automated flow above:
+
+- **Require a pull request before merging** (0 required approvals) — keeps direct pushes off `main` without blocking a solo maintainer.
+- **Block force-pushes and deletions.**
+- **No required status checks.** The Tests workflow runs on every code PR and is visible there, but it is intentionally *not* a hard merge gate. The Release PR is opened by the built-in `GITHUB_TOKEN`, and GitHub does not trigger workflows for such PRs (loop prevention), so a required check would leave every Release PR permanently unmergeable. The `publish` job re-runs build → lint → test before `npm publish`, so releases are still gated on a green build.
+
+> If enforced required checks on the Release PR are ever wanted, the only way to get them is to have release-please open its PR with a Personal Access Token instead of the built-in token, so the Tests workflow fires. That trades a stored secret for enforced checks; the current setup avoids the secret.
+
+## Publishing authentication
+
+Publishing uses **npm Trusted Publishing (OIDC)** — there is no `NPM_TOKEN` secret. The package must be linked to this repo's `release.yml` workflow on npmjs.com:
+
+- Package → **Settings → Trusted Publisher** (Publishing access)
+- GitHub Actions publisher: organization/user `tbaur`, repository `homebridge-bluos`, workflow `release.yml`, no environment.
+
+This link only needs to exist before the first Release PR is merged; it does not need to be reconfigured per release. The package can still be unpublished when you create the publisher — do not `npm publish` by hand just to wire it up.
+
+The `## Unreleased` stub in `CHANGELOG.md` is a placeholder. The first Release PR writes the dated version section from Conventional Commit titles; drop the stub when you review that PR. Because `.release-please-manifest.json` already lists `0.1.0`, that first automated release is **0.1.1** unless you set the manifest to `0.0.0` first.
+
+## Notes
+
+- **PR titles drive releases.** With squash merges, the PR title becomes the commit release-please reads. `chore:`/`docs:`/`ci:` titles intentionally produce no release.
+- **The Release PR does not re-run the Tests workflow.** GitHub does not trigger workflows for PRs opened by the built-in token (loop prevention). The code was already tested on its own PR, and the `publish` job builds, lints, and tests again before publishing, so nothing ships untested.
+- **Version source of truth** is `.release-please-manifest.json`. The `package.json` version is owned by release-please and is not hand-edited.
+- Behavior is configured in `release-please-config.json`.
+
+## Manual fallback
+
+Manual publishing is rarely needed and bypasses CI provenance and manifest syncing. If unavoidable:
+
+```bash
+npm run clean && npm run build && npm run lint && npm test
+npm publish --dry-run   # verify contents
+npm publish             # requires npm login + OTP
+```

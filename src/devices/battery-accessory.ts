@@ -1,0 +1,109 @@
+/**
+ * Copyright (c) 2026 tbaur
+ *
+ * Licensed under the Apache License, Version 2.0
+ * See LICENSE file for full license text
+ *
+ * @fileoverview State of charge for a portable player.
+ *
+ * `/SyncStatus` already carries `<battery level charging/>` on players with a
+ * battery pack fitted, so this costs one service and no extra traffic. A player
+ * without a pack never reports the element, and the accessory then reports No
+ * Response rather than inventing a charge level.
+ */
+
+import type { CharacteristicValue, Service } from 'homebridge'
+
+import type { PlayerObservation, RefreshReason } from '../types'
+import { forLog } from '../utils'
+import { BaseAccessory, type AccessoryInit } from './base-accessory'
+
+/** Below this percentage HomeKit is told the battery is low. */
+const LOW_BATTERY_THRESHOLD = 20
+
+/** A battery sensor for one player. */
+export class BatteryAccessory extends BaseAccessory {
+  private readonly service: Service
+
+  private level: number | undefined
+
+  private charging = false
+
+  constructor(init: AccessoryInit) {
+    super(init)
+    const { Characteristic: Char, Service: HapService } = this.host.hap
+    this.service = this.requireService(HapService.Battery)
+    this.service.setCharacteristic(Char.Name, this.displayName)
+    this.service.getCharacteristic(Char.BatteryLevel).onGet(() => this.readLevel())
+    this.service.getCharacteristic(Char.StatusLowBattery).onGet(() => this.readLowBattery())
+    this.service.getCharacteristic(Char.ChargingState).onGet(() => this.readChargingState())
+  }
+
+  private readLevel(): CharacteristicValue {
+    this.requireBattery()
+    return this.level ?? 0
+  }
+
+  private readLowBattery(): CharacteristicValue {
+    this.requireBattery()
+    const { Characteristic: Char } = this.host.hap
+    return (this.level ?? 100) <= LOW_BATTERY_THRESHOLD
+      ? Char.StatusLowBattery.BATTERY_LEVEL_LOW
+      : Char.StatusLowBattery.BATTERY_LEVEL_NORMAL
+  }
+
+  private readChargingState(): CharacteristicValue {
+    this.requireBattery()
+    const { Characteristic: Char } = this.host.hap
+    return this.charging ? Char.ChargingState.CHARGING : Char.ChargingState.NOT_CHARGING
+  }
+
+  private requireBattery(): void {
+    this.requireObservedState()
+    if (this.level === undefined) {
+      throw this.communicationFailure()
+    }
+  }
+
+  protected override updateFromObservation(
+    observation: PlayerObservation,
+    _reason: RefreshReason,
+  ): void {
+    const battery = observation.battery
+    if (battery === undefined) {
+      if (this.level !== undefined) {
+        this.level = undefined
+      }
+      this.warnOnce(
+        'no-battery',
+        `${forLog(this.displayName)} reports no battery pack; disable the battery sensor `
+        + 'for this player in the plugin settings',
+      )
+      this.markUnavailable()
+      return
+    }
+    this.level = battery.level
+    this.charging = battery.charging
+
+    const { Characteristic: Char } = this.host.hap
+    this.service.updateCharacteristic(Char.BatteryLevel, battery.level)
+    this.service.updateCharacteristic(
+      Char.StatusLowBattery,
+      battery.level <= LOW_BATTERY_THRESHOLD
+        ? Char.StatusLowBattery.BATTERY_LEVEL_LOW
+        : Char.StatusLowBattery.BATTERY_LEVEL_NORMAL,
+    )
+    this.service.updateCharacteristic(
+      Char.ChargingState,
+      battery.charging ? Char.ChargingState.CHARGING : Char.ChargingState.NOT_CHARGING,
+    )
+  }
+
+  protected override markUnavailable(): void {
+    const { Characteristic: Char } = this.host.hap
+    const error = this.communicationFailure()
+    this.service.updateCharacteristic(Char.BatteryLevel, error)
+    this.service.updateCharacteristic(Char.StatusLowBattery, error)
+    this.service.updateCharacteristic(Char.ChargingState, error)
+  }
+}

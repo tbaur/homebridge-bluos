@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SyncStatus etag="101" syncStat="101" version="4.16.6" id="192.168.4.14:11000" db="-32.1" volume="60" name="Zone Three" model="CI-S2" modelName="CI S2" class="streamer" icon="/images/players/CI-S1_nt.png" brand="NAD" schemaVersion="34" initialized="true" group="Zone Three+Zone Four" mac="90:56:82:0A:00:05"><slave id="192.168.4.14" port="11010" name="Zone Four" model="CI-S2" icon="/images/players/CI-S1_nt.png"></slave><pairWithSub></pairWithSub></SyncStatus>

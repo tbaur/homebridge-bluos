@@ -1,0 +1,135 @@
+{
+  "pluginAlias": "BluOS",
+  "pluginType": "platform",
+  "singular": true,
+  "customUi": true,
+  "customUiPath": "./homebridge-ui",
+  "headerDisplay": "Exposes BluOS players to HomeKit as a volume slider, a mute switch, volume-preset switches and a battery sensor. Verified on NAD and Bluesound hardware; other BluOS brands run the same firmware and are expected to work. Use **Discover Players** to find zones on your network; every field below can also be edited by hand.",
+  "footerDisplay": "HomeKit has no speaker volume control that the Home app renders, so the volume slider is exposed as a fan. See the [documentation](https://github.com/tbaur/homebridge-bluos#readme) for what this plugin does and does not do.",
+  "schema": {
+    "type": "object",
+    "required": ["name"],
+    "properties": {
+      "name": {
+        "title": "Platform Name",
+        "type": "string",
+        "default": "BluOS",
+        "description": "Shown in the Homebridge log."
+      },
+      "options": {
+        "title": "Options",
+        "type": "object",
+        "properties": {
+          "sliderService": {
+            "title": "Volume Slider Style",
+            "type": "string",
+            "default": "fan",
+            "oneOf": [
+              { "title": "Fan — recommended", "enum": ["fan"] },
+              { "title": "Lightbulb — affected by \"turn off all the lights\"", "enum": ["lightbulb"] }
+            ],
+            "description": "Both render an identical slider. A lightbulb is swept up by Siri commands aimed at lights, which can silence or max out your speakers."
+          },
+          "discoveryTimeoutSec": {
+            "title": "Discovery Timeout (seconds)",
+            "type": "integer",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 30,
+            "description": "How long to listen for players. Raise it on a busy or slow network."
+          }
+        }
+      },
+      "devices": {
+        "title": "Players",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "title": "Player",
+          "required": ["id", "name", "host"],
+          "properties": {
+            "id": {
+              "title": "Identity",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9:._-]{0,127}$",
+              "description": "Stable identity, normally the MAC address and zone port. Written by discovery. Changing it detaches the accessories from their HomeKit rooms and automations."
+            },
+            "name": {
+              "title": "Name",
+              "type": "string",
+              "maxLength": 64,
+              "description": "The room's name. Accessories are named from it: \"Study\" gives \"Study Volume\", \"Study Mute\" and \"Study Battery\"."
+            },
+            "host": {
+              "title": "Address",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 254,
+              "pattern": "^[A-Za-z0-9]([A-Za-z0-9._-]{0,252}[A-Za-z0-9])?$",
+              "description": "IP address or hostname. Re-resolved automatically if the player's address changes."
+            },
+            "port": {
+              "title": "Port",
+              "type": "integer",
+              "default": 11000,
+              "minimum": 1,
+              "maximum": 65535,
+              "description": "11000 for a normal player. Multi-zone models such as the NAD CI-S2 and CI 580 use 11010, 11020 and 11030 for their extra zones."
+            },
+            "volumeSlider": {
+              "title": "Volume Slider",
+              "type": "boolean",
+              "default": true,
+              "description": "A 0-100 slider for this player's volume."
+            },
+            "sliderService": {
+              "title": "Slider Style Override",
+              "type": "string",
+              "oneOf": [
+                { "title": "Use the platform setting", "enum": [""] },
+                { "title": "Fan", "enum": ["fan"] },
+                { "title": "Lightbulb", "enum": ["lightbulb"] }
+              ]
+            },
+            "mute": {
+              "title": "Mute Switch",
+              "type": "boolean",
+              "default": false,
+              "description": "A switch that is on when the player is muted. Independent of the slider."
+            },
+            "battery": {
+              "title": "Battery Sensor",
+              "type": "boolean",
+              "default": false,
+              "description": "State of charge. Only for players with a battery pack fitted, such as a PULSE FLEX with the BP100."
+            },
+            "volumePresets": {
+              "title": "Volume Presets",
+              "type": "array",
+              "description": "Switches that set one specific level. Safer than a slider in automations, and addressable by name with Siri.",
+              "items": {
+                "type": "object",
+                "required": ["name", "volume"],
+                "properties": {
+                  "name": {
+                    "title": "Name",
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "volume": {
+                    "title": "Volume",
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

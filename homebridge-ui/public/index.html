@@ -1,0 +1,87 @@
+<!--
+  Copyright (c) 2026 tbaur
+
+  Licensed under the Apache License, Version 2.0
+  See LICENSE file for full license text
+
+  Markup and styles for the custom configuration UI. The behaviour lives in
+  index.js, which is a separate file so that the linter and the tests can reach
+  it.
+-->
+<style>
+  .bluos-intro { margin-bottom: 1rem; }
+  .bluos-toolbar { display: flex; gap: .5rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem; }
+  .bluos-toolbar .form-group { margin-bottom: 0; }
+  .bluos-card { border: 1px solid rgba(128, 128, 128, .3); border-radius: .5rem; padding: .85rem 1rem; margin-bottom: .75rem; }
+  .bluos-card.is-selected { border-color: #007bff; box-shadow: 0 0 0 1px rgba(0, 123, 255, .35); }
+  .bluos-card-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .bluos-card-title { font-weight: 600; flex: 1 1 12rem; min-width: 12rem; }
+  .bluos-meta { font-size: .82rem; opacity: .75; margin-top: .15rem; }
+  .bluos-badge { font-size: .7rem; text-transform: uppercase; letter-spacing: .03em; padding: .12rem .4rem; border-radius: .25rem; background: rgba(128, 128, 128, .2); }
+  .bluos-badge.warn { background: rgba(255, 193, 7, .28); }
+  .bluos-options { display: flex; gap: 1.1rem; flex-wrap: wrap; margin-top: .6rem; }
+  .bluos-presets { margin-top: .6rem; }
+  .bluos-preset-row { display: flex; gap: .4rem; align-items: center; margin-bottom: .35rem; }
+  .bluos-preset-row input[type="text"] { flex: 1 1 8rem; }
+  .bluos-preset-row input[type="number"] { width: 5.5rem; }
+  .bluos-empty { opacity: .7; font-style: italic; padding: 1rem 0; }
+  .bluos-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+  .bluos-actions .spacer { flex: 1 1 auto; }
+</style>
+
+<div class="bluos-intro">
+  <p class="mb-1">
+    Discovery browses your network for BluOS zones. Multi-zone amplifiers such as the
+    NAD CI&nbsp;S2 and CI&nbsp;580 appear once per zone, each with its own volume.
+  </p>
+  <p class="mb-0 text-muted" style="font-size: .85rem;">
+    HomeKit has no speaker volume control that the Home app draws, so the volume slider is
+    exposed as a fan. Turning it off sets the level to zero; the mute switch is separate.
+  </p>
+</div>
+
+<div class="bluos-toolbar">
+  <button class="btn btn-primary" id="discover">Discover Players</button>
+  <div class="form-group">
+    <label for="timeout" class="mb-0" style="font-size: .8rem;">Listen for</label>
+    <select class="form-control form-control-sm" id="timeout">
+      <option value="3">3 seconds</option>
+      <option value="5" selected>5 seconds</option>
+      <option value="10">10 seconds</option>
+      <option value="20">20 seconds</option>
+    </select>
+  </div>
+  <div class="spacer" style="flex: 1 1 auto;"></div>
+  <button class="btn btn-outline-secondary btn-sm" id="toggle-manual">Add by address</button>
+  <button class="btn btn-outline-secondary btn-sm" id="toggle-json">Advanced editor</button>
+</div>
+
+<div id="manual" class="bluos-card" hidden>
+  <div class="form-row">
+    <div class="form-group col-sm-7 mb-2">
+      <label for="manual-host" style="font-size: .8rem;">IP address or hostname</label>
+      <input type="text" class="form-control form-control-sm" id="manual-host" placeholder="192.168.4.10" />
+    </div>
+    <div class="form-group col-sm-3 mb-2">
+      <label for="manual-port" style="font-size: .8rem;">Port (optional)</label>
+      <input type="number" class="form-control form-control-sm" id="manual-port" placeholder="all" />
+    </div>
+    <div class="form-group col-sm-2 mb-2 d-flex align-items-end">
+      <button class="btn btn-secondary btn-sm btn-block" id="manual-probe">Probe</button>
+    </div>
+  </div>
+  <div class="text-muted" style="font-size: .8rem;">
+    Use this when multicast is filtered on your network. Leave the port empty to try every
+    documented BluOS port.
+  </div>
+</div>
+
+<div id="players"></div>
+
+<div class="bluos-actions">
+  <button class="btn btn-success" id="save" disabled>Save</button>
+  <span class="spacer"></span>
+  <span id="summary" class="text-muted" style="font-size: .85rem;"></span>
+</div>
+
+<script src="index.js"></script>

@@ -1,0 +1,91 @@
+{
+  "name": "homebridge-bluos",
+  "displayName": "Homebridge BluOS",
+  "version": "0.1.0",
+  "description": "Homebridge plugin for BluOS players — per-zone volume, mute, volume-preset and battery accessories over the LAN Custom Integration API. Verified on NAD and Bluesound hardware",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "keywords": [
+    "homebridge-plugin",
+    "supports-hap",
+    "bluos",
+    "bluesound",
+    "nad",
+    "dali",
+    "speaker",
+    "volume",
+    "homekit"
+  ],
+  "author": {
+    "name": "tbaur",
+    "url": "https://github.com/tbaur"
+  },
+  "maintainers": [
+    {
+      "name": "tbaur",
+      "url": "https://github.com/tbaur"
+    }
+  ],
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/tbaur"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tbaur/homebridge-bluos.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tbaur/homebridge-bluos/issues"
+  },
+  "homepage": "https://github.com/tbaur/homebridge-bluos#readme",
+  "overrides": {
+    "js-yaml": "^4.2.0",
+    "brace-expansion": "^5.0.9"
+  },
+  "dependencies": {
+    "@homebridge/plugin-ui-utils": "2.2.4",
+    "multicast-dns": "7.2.5"
+  },
+  "devDependencies": {
+    "@types/dns-packet": "^5.6.5",
+    "@types/jest": "^30.0.0",
+    "@types/multicast-dns": "^7.2.4",
+    "@types/node": "^20.19.43",
+    "@typescript-eslint/eslint-plugin": "^8.51.0",
+    "@typescript-eslint/parser": "^8.51.0",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0",
+    "homebridge": "^2.1.0",
+    "jest": "^30.4.2",
+    "ts-jest": "29.4.12",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "homebridge": "^1.6.0 || ^2.0.0",
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "pretest": "npm run build",
+    "test": "NODE_ENV=test jest --coverage",
+    "test:watch": "NODE_ENV=test jest --watch --coverage=false",
+    "test:unit": "npm run build && NODE_ENV=test jest --coverage --testPathPatterns tests/unit",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix --max-warnings 0"
+  },
+  "files": [
+    "dist/**/*",
+    "config.schema.json",
+    "homebridge-ui",
+    "docs/**/*",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "DEVELOPMENT.md"
+  ]
+}
