@@ -50,6 +50,7 @@ import {
   PLATFORM_DEVICE_ID,
   PLATFORM_NAME,
   PLUGIN_NAME,
+  REBOOT_GRACE_MS,
   UUID_PREFIX,
   readPluginVersion,
 } from './settings'
@@ -67,6 +68,7 @@ import {
   forLog,
   newAccessorySerialNumber,
   parseAccessoryContext,
+  RebootGrace,
   resolveAccessories,
   resolveDiscoveryTimeoutSec,
   validateConfig,
@@ -117,6 +119,9 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
 
   /** The launch address sweep, tracked so a shutdown can wait for it to end. */
   private launchSweep: Promise<void> | undefined
+
+  /** Addresses we have just asked to reboot, while silence from them is expected. */
+  private readonly rebootGrace = new RebootGrace(REBOOT_GRACE_MS)
 
   constructor(log: Logging, config: PlatformConfig, api: API) {
     this.log = log
@@ -272,6 +277,28 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
       .filter((device) => device.id !== deviceId
         && (this.endpointFor(device.id)?.host ?? device.host) === host)
       .map((device) => device.name)
+  }
+
+  /**
+   * A reboot request has reached this address.
+   *
+   * In-flight long-polls are dropped so the next reading is of the player after
+   * it comes back, not of the request that died with the box. Failures during
+   * the grace window do not mark accessories unreachable.
+   */
+  expectReboot(host: string): void {
+    this.rebootGrace.expect(host)
+    for (const [deviceId, poller] of this.pollers) {
+      if (this.hostOf(deviceId) === host) {
+        poller.refreshNow()
+      }
+    }
+  }
+
+  /** Current address of a player, preferring the poller when it has one. */
+  private hostOf(deviceId: string): string | undefined {
+    return this.endpointFor(deviceId)?.host
+      ?? this.devices.find((device) => device.id === deviceId)?.host
   }
 
   // --- Lifecycle ------------------------------------------------------------
@@ -629,6 +656,9 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
   }
 
   private publish(deviceId: string, observation: PlayerObservation, reason: RefreshReason): void {
+    // The player answered, so the reboot is over even if the window has time
+    // left. Anything that fails after this is a real outage and is said so.
+    this.rebootGrace.clear(this.hostOf(deviceId))
     for (const handler of this.handlers.get(deviceId) ?? []) {
       try {
         handler.applyObservation(observation, reason)
@@ -641,6 +671,9 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
   }
 
   private reportUnavailable(deviceId: string, error: unknown): void {
+    if (this.rebootGrace.isExpected(this.hostOf(deviceId))) {
+      return
+    }
     for (const handler of this.handlers.get(deviceId) ?? []) {
       // Guarded exactly like publish. This runs from inside the poll loop's catch
       // block, so a throw here — a characteristic missing from a hand-edited

@@ -243,7 +243,7 @@ describe('the settings page', () => {
 
     expect((await saveOne(page)).reboot).toBe(false)
 
-    tick(page, 'Reboot switch (restarts this player, and any zone sharing its box)')
+    tick(page, 'Reboot switch (reboots this player, and any zone sharing its box)')
 
     expect((await saveOne(page)).reboot).toBe(true)
   })

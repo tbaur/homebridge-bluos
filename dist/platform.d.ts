@@ -51,6 +51,8 @@ export declare class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHo
     private readonly staggerTimers;
     /** The launch address sweep, tracked so a shutdown can wait for it to end. */
     private launchSweep;
+    /** Addresses we have just asked to reboot, while silence from them is expected. */
+    private readonly rebootGrace;
     constructor(log: Logging, config: PlatformConfig, api: API);
     get hap(): API['hap'];
     /** Homebridge hands back every accessory it restored from disk. */
@@ -98,6 +100,16 @@ export declare class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHo
      * not asked to manage.
      */
     playersSharingAddress(deviceId: string): readonly string[];
+    /**
+     * A reboot request has reached this address.
+     *
+     * In-flight long-polls are dropped so the next reading is of the player after
+     * it comes back, not of the request that died with the box. Failures during
+     * the grace window do not mark accessories unreachable.
+     */
+    expectReboot(host: string): void;
+    /** Current address of a player, preferring the poller when it has one. */
+    private hostOf;
     private start;
     private stop;
     /**

@@ -14,13 +14,13 @@ Browsing, search, queues and artwork stay in the BluOS app, which HomeKit cannot
 - **Mute switch:** unmuting restores the level the player remembered, not a guess
 - **Volume presets:** one switch per exact level, addressable by name with Siri
 - **Battery sensor:** level, charging state and low-battery warning, for players with a battery pack
-- **Reboot switch:** momentary, so a scene cannot restart your stereo, and still pressable when the player has stopped answering
+- **Reboot switch:** momentary, so a scene cannot reboot your stereo, and still pressable when the player has stopped answering
 - **Grouping-aware:** a zone leading a BluOS group moves the whole group, exactly as it does in the BluOS app
 - **Multi-zone chassis:** each zone of a NAD CI S2 or CI 580 is its own player, on its own port
 
 ### For the whole install
 
-- **Reboot all:** off by default. One switch that restarts every BluOS player it can find on the network, naming each one in the log first
+- **Reboot all:** off by default. One switch that reboots every BluOS player it can find on the network. The info log is a count (`found 2 device(s), 3 player(s)`); the debug log names each box
 
 ### Reliability
 
@@ -111,7 +111,7 @@ Only one `BluOS` platform block is supported. It can hold as many players as you
 | `devices` | ✓ | List of players |
 | `options.sliderService` | | `fan` (default) or `lightbulb`, for every slider |
 | `options.discoveryTimeoutSec` | | mDNS listening window, 1–30 seconds (default 5) |
-| `options.rebootAll` | | Expose one switch that restarts **every BluOS player on the network** (default false) |
+| `options.rebootAll` | | Expose one switch that reboots **every BluOS player on the network** (default false) |
 | `options.rebootAllName` | | What that switch is called in the Home app |
 
 Each entry in `devices[]` takes `id`, `name` and `host`, plus an optional `port`, `volumeSlider`, `sliderService`, `mute`, `battery`, `reboot` and `volumePresets[]`. The [detailed documentation](docs/README-DETAILED.md#devices-entries) describes each one, and explains which changes are safe to make to a working install.
@@ -121,7 +121,7 @@ Each entry in `devices[]` takes `id`, `name` and `host`, plus an optional `port`
 1. **Nothing found by Discover Players.** mDNS is often filtered across VLANs and by some access points. Use manual address entry, or add the player by hand
 2. **Everything shows No Response and stays that way.** Check the log for `BluOS is disabled until its configuration is fixed`
 3. **A zone on a multi-zone chassis is missing.** Check the port. Zone two is 11010, not 11000
-4. **A reboot switch restarted the room next door.** Expected on a multi-zone chassis. BluOS serves reboot per box, not per zone
+4. **A reboot switch rebooted the room next door.** Expected on a multi-zone chassis. BluOS serves reboot per box, not per zone
 5. **The reboot switch turns itself off.** By design. It is a button, not a state
 6. Restart Homebridge after editing `config.json` by hand
 

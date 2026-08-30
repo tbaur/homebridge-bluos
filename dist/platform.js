@@ -58,6 +58,8 @@ class BluOSPlatform {
     staggerTimers = new Set();
     /** The launch address sweep, tracked so a shutdown can wait for it to end. */
     launchSweep;
+    /** Addresses we have just asked to reboot, while silence from them is expected. */
+    rebootGrace = new utils_1.RebootGrace(settings_1.REBOOT_GRACE_MS);
     constructor(log, config, api) {
         this.log = log;
         this.config = config;
@@ -197,6 +199,26 @@ class BluOSPlatform {
             .filter((device) => device.id !== deviceId
             && (this.endpointFor(device.id)?.host ?? device.host) === host)
             .map((device) => device.name);
+    }
+    /**
+     * A reboot request has reached this address.
+     *
+     * In-flight long-polls are dropped so the next reading is of the player after
+     * it comes back, not of the request that died with the box. Failures during
+     * the grace window do not mark accessories unreachable.
+     */
+    expectReboot(host) {
+        this.rebootGrace.expect(host);
+        for (const [deviceId, poller] of this.pollers) {
+            if (this.hostOf(deviceId) === host) {
+                poller.refreshNow();
+            }
+        }
+    }
+    /** Current address of a player, preferring the poller when it has one. */
+    hostOf(deviceId) {
+        return this.endpointFor(deviceId)?.host
+            ?? this.devices.find((device) => device.id === deviceId)?.host;
     }
     // --- Lifecycle ------------------------------------------------------------
     start() {
@@ -507,6 +529,9 @@ class BluOSPlatform {
         }
     }
     publish(deviceId, observation, reason) {
+        // The player answered, so the reboot is over even if the window has time
+        // left. Anything that fails after this is a real outage and is said so.
+        this.rebootGrace.clear(this.hostOf(deviceId));
         for (const handler of this.handlers.get(deviceId) ?? []) {
             try {
                 handler.applyObservation(observation, reason);
@@ -517,6 +542,9 @@ class BluOSPlatform {
         }
     }
     reportUnavailable(deviceId, error) {
+        if (this.rebootGrace.isExpected(this.hostOf(deviceId))) {
+            return;
+        }
         for (const handler of this.handlers.get(deviceId) ?? []) {
             // Guarded exactly like publish. This runs from inside the poll loop's catch
             // block, so a throw here — a characteristic missing from a hand-edited

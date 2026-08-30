@@ -74,4 +74,12 @@ export interface AccessoryHost {
      * loud rather than letting someone discover it.
      */
     playersSharingAddress(deviceId: string): readonly string[];
+    /**
+     * A reboot request has reached this address, so silence from it is expected.
+     *
+     * The poller will fail while the box is down. Calling this is what stops every
+     * accessory on that address from warning, and what makes the next successful
+     * poll the source of truth for HomeKit instead of the pre-reboot reading.
+     */
+    expectReboot(host: string): void;
 }

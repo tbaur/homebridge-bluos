@@ -13,9 +13,10 @@
  *
  * Its reach is wider than the plugin's configuration: it restarts every player
  * mDNS answers for, including ones deliberately left out of `devices[]`. That is
- * what it is for, and it is why the option is off by default and why every target
- * is named in the log before a single request goes out. The BluOS API has no
- * authentication, so anything on the segment will comply.
+ * what it is for, and it is why the option is off by default. The info log is a
+ * count of devices and players; the debug log names every box before a single
+ * request goes out. The BluOS API has no authentication, so anything on the
+ * segment will comply.
  *
  * It works in addresses rather than players, because reboot is served on port 80
  * and port 80 is one server per chassis. A CI S2 carrying two zones is one
@@ -34,7 +35,7 @@ export declare class RebootAllAccessory extends BaseAccessory {
     private resetTimer;
     constructor(init: AccessoryInit);
     private writeOn;
-    /** Name everything that is about to go down, before any of it does. */
+    /** Count at info, name every box at debug, before any request goes out. */
     private announce;
     /**
      * Restart every target, letting each succeed or fail on its own.

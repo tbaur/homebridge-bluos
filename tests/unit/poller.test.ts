@@ -462,6 +462,22 @@ describe('DevicePoller', () => {
     })
   })
 
+  describe('refreshNow', () => {
+    it('drops a held long-poll and starts a plain read', async () => {
+      const test = setup([async () => observation({ etag: '95', volume: 60 })])
+      test.poller.start()
+      await flush()
+      const readsAfterStart = test.reads.length
+      expect(test.polls).toHaveLength(1)
+
+      test.poller.refreshNow()
+      await flush()
+      await test.stop()
+
+      expect(test.reads.length).toBeGreaterThan(readsAfterStart)
+    })
+  })
+
   describe('endpoint changes', () => {
     it('ignores a move to the same address', async () => {
       const test = setup([async () => observation()])

@@ -12,8 +12,8 @@ A checklist of what is built. The plugin aims to cover everything about a BluOS 
 - ✅ Mute switch, with unmute restoring the level the player remembered instead of a guess
 - ✅ Volume preset switches: one exact level per switch, addressable by name with Siri; set On sets the level, set Off is a no-op
 - ✅ Battery sensor (level, charging state, low-battery) for players with a battery pack fitted
-- ✅ Reboot switch per player, momentary so a scene or "turn everything off" cannot restart the stereo, and still pressable when the player has stopped answering. Restarts the whole box on a multi-zone chassis, which BluOS gives no way to avoid, and warns at startup when that means other configured rooms
-- ✅ Optional "reboot all" switch that restarts every BluOS player on the network, naming each one in the log before anything is sent, and sending once per box instead of once per zone. You choose its name with `options.rebootAllName`, so it can sit in whichever Home app room suits you
+- ✅ Reboot switch per player, momentary so a scene or "turn everything off" cannot reboot the stereo, and still pressable when the player has stopped answering. Reboots the whole box on a multi-zone chassis, which BluOS gives no way to avoid, and warns at startup when that means other configured rooms
+- ✅ Optional "reboot all" switch that reboots every BluOS player on the network, sending once per box instead of once per zone. The info log is a count (`found … device(s), … player(s)`), then `N of N device(s) rebooted`. The debug log names each box before anything is sent. Accessories on a box that was just rebooted stay quiet until it answers again, then take its live state. You choose its name with `options.rebootAllName`, so it can sit in whichever Home app room suits you
 - ✅ Fixed-output players detected from `volume="-1"` and given no slider, with one explanatory log line
 - ✅ Multi-zone chassis support (NAD CI S2, CI 580): each zone is a separate player on its own port
 - ✅ mDNS discovery in the settings page, with manual address entry for networks that filter multicast
@@ -89,7 +89,7 @@ HomeKit has no way to render a library or a queue, and no vocabulary for "play t
 
 | Configuration | HomeKit service |
 | --- | --- |
-| `options.rebootAll` | Switch, momentary. One for the whole install, restarting every box it can find. Named by `options.rebootAllName` |
+| `options.rebootAll` | Switch, momentary. One for the whole install, rebooting every box it can find. Named by `options.rebootAllName` |
 
 ## Protocol surface
 

@@ -125,6 +125,16 @@ export const REBOOT_RESOURCE = 'reboot'
 /** @see REBOOT_RESOURCE */
 export const REBOOT_FORM: Readonly<Record<string, string>> = { noheader: '0', yes: '1' }
 
+/**
+ * How long after a reboot request we treat silence as the player coming back.
+ *
+ * A reboot takes the control ports down with the box. Polls fail, and without
+ * this window every accessory on that box would warn "is not responding" and
+ * then info "is responding again" — which is exactly what a reboot looks like.
+ * After this window a still-silent player is logged the usual way.
+ */
+export const REBOOT_GRACE_MS = 90_000
+
 /** Minimum spacing between control calls to one endpoint. */
 export const CONTROL_RATE_LIMIT_MS = 100
 

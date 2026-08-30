@@ -244,6 +244,8 @@ export interface Harness {
   }
   /** Targets the global reboot switch is told about. */
   rebootTargets: jest.Mock<Promise<readonly RebootTarget[]>, []>
+  /** Addresses the reboot accessories told the host to expect silence from. */
+  expectedReboots: string[]
   adopted: VolumeResult[]
   persisted: number
   /** Accessories whose context was written back, in order. */
@@ -302,6 +304,7 @@ export function harness(overrides: {
   }
 
   const rebootTargets = jest.fn(async () => overrides.rebootTargets ?? [])
+  const expectedReboots: string[] = []
 
   const endpoint = 'endpoint' in overrides
     ? overrides.endpoint
@@ -323,6 +326,9 @@ export function harness(overrides: {
     },
     rebootTargets,
     playersSharingAddress: () => overrides.sharingAddress ?? [],
+    expectReboot: (host: string) => {
+      expectedReboots.push(host)
+    },
   }
 
   return {
@@ -332,6 +338,7 @@ export function harness(overrides: {
     log,
     client,
     rebootTargets,
+    expectedReboots,
     adopted,
     get persisted() {
       return persisted
