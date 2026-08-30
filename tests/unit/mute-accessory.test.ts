@@ -171,4 +171,22 @@ describe('MuteAccessory', () => {
     await expect(test.service('Switch').getCharacteristic('On').write(true))
       .rejects.toThrow(/no longer configured/)
   })
+
+  it('carries the battery service when it is the host tile', () => {
+    const test = harness({ context: { kind: 'mute', hostsBattery: true } })
+    const accessory = new MuteAccessory(test)
+
+    accessory.applyObservation(observation({ muted: true, battery: { level: 64, charging: true } }), 'poll')
+
+    expect(test.service('Switch').lastValue('On')).toBe(true)
+    expect(test.service('Battery').lastValue('BatteryLevel')).toBe(64)
+    expect(test.service('Battery').lastValue('ChargingState')).toBe(1)
+  })
+
+  it('does not add a battery service when it is not the host', () => {
+    const test = harness({ context: { kind: 'mute' } })
+    new MuteAccessory(test)
+
+    expect(() => test.service('Battery')).toThrow(/no Battery service was created/)
+  })
 })

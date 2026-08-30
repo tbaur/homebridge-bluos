@@ -27,6 +27,8 @@ export declare class MuteAccessory extends BaseAccessory {
     private readonly service;
     /** Last mute state read from the player. */
     private muted;
+    /** Present when this switch also carries the player's battery. */
+    private readonly battery;
     constructor(init: AccessoryInit);
     private readOn;
     private writeOn;

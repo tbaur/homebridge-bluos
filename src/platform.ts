@@ -523,6 +523,9 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
     if (Number.isInteger(previous?.lastNonZeroVolume)) {
       context.lastNonZeroVolume = previous?.lastNonZeroVolume
     }
+    if (accessory.hostsBattery === true) {
+      context.hostsBattery = true
+    }
     return context
   }
 

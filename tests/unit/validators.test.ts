@@ -547,9 +547,25 @@ describe('resolveAccessories', () => {
     expect(accessories.map((entry) => [entry.kind, entry.name])).toEqual([
       ['volume', 'Zone One Volume'],
       ['mute', 'Zone One Mute'],
-      ['battery', 'Zone One Battery'],
       ['reboot', 'Zone One Reboot'],
       ['volumePreset', 'Quiet'],
+    ])
+    expect(accessories.find((entry) => entry.kind === 'volume')?.hostsBattery).toBe(true)
+    expect(accessories.find((entry) => entry.kind === 'mute')?.hostsBattery).toBeUndefined()
+  })
+
+  it('puts the battery on mute when there is no slider', () => {
+    const accessories = resolveAccessories([device({ mute: true, battery: true })])
+
+    expect(accessories.map((entry) => entry.kind)).toEqual(['mute'])
+    expect(accessories[0]?.hostsBattery).toBe(true)
+  })
+
+  it('keeps a standalone battery accessory when nothing else is on', () => {
+    const accessories = resolveAccessories([device({ battery: true })])
+
+    expect(accessories.map((entry) => [entry.kind, entry.name])).toEqual([
+      ['battery', 'Zone One Battery'],
     ])
   })
 

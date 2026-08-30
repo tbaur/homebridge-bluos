@@ -94,6 +94,7 @@ interface Page {
   players: () => FakeNode
   /** Player names, which the page renders as editable fields rather than text. */
   names: () => string[]
+  savePluginConfig: jest.Mock
 }
 
 /** Lets the page's promise chains run to completion. */
@@ -115,7 +116,7 @@ async function settle(): Promise<void> {
 async function load(config: unknown[], request?: jest.Mock): Promise<Page> {
   const elements = new Map<string, FakeNode>()
   for (const id of [
-    'players', 'summary', 'save', 'timeout', 'manual-host', 'manual-port',
+    'players', 'summary', 'timeout', 'manual-host', 'manual-port',
     'manual', 'discover', 'manual-probe', 'toggle-manual', 'toggle-json',
     'reboot-all', 'reboot-all-name', 'reboot-all-name-row',
   ]) {
@@ -182,6 +183,7 @@ async function load(config: unknown[], request?: jest.Mock): Promise<Page> {
     names: () => byId('players').descendants()
       .filter((node) => node.attributes.get('maxlength') === '64')
       .map((node) => node.value),
+    savePluginConfig: homebridge.savePluginConfig,
   }
 }
 
@@ -219,9 +221,8 @@ function tick(page: Page, label: string): void {
   input.fire('change')
 }
 
-/** Saves and returns the one device that was written. */
+/** The one device the page has pushed into Homebridge. */
 async function saveOne(page: Page): Promise<Record<string, unknown>> {
-  page.byId('save').fire('click')
   await settle()
   const devices = page.saved()
   expect(devices).toHaveLength(1)
@@ -234,6 +235,17 @@ describe('the settings page', () => {
 
     expect(page.players().textContent).toContain('192.168.4.11:11000')
     expect(page.byId('summary').textContent).toBe('1 player(s), 3 HomeKit accessory(s).')
+  })
+
+  it('pushes the form into Homebridge and leaves disk save to the footer button', async () => {
+    const page = await load([configured])
+
+    expect(page.savePluginConfig).not.toHaveBeenCalled()
+    expect((await saveOne(page)).mute).toBe(true)
+
+    tick(page, 'Mute switch')
+    expect((await saveOne(page)).mute).toBe(false)
+    expect(page.savePluginConfig).not.toHaveBeenCalled()
   })
 
   it('leaves the reboot switch off until it is ticked, and counts it once it is', async () => {
@@ -282,8 +294,7 @@ describe('the settings page', () => {
       page.byId('reboot-all').checked = true
       page.byId('reboot-all').fire('change')
       page.byId('reboot-all-name').value = 'Restart Everything'
-
-      page.byId('save').fire('click')
+      page.byId('reboot-all-name').fire('input')
       await settle()
 
       expect(page.savedOptions()).toMatchObject({
@@ -299,8 +310,7 @@ describe('the settings page', () => {
       page.byId('reboot-all').checked = true
       page.byId('reboot-all').fire('change')
       page.byId('reboot-all-name').value = '   '
-
-      page.byId('save').fire('click')
+      page.byId('reboot-all-name').fire('input')
       await settle()
 
       expect(page.savedOptions()).toEqual({ sliderService: 'fan', rebootAll: true })
@@ -324,14 +334,12 @@ describe('the settings page', () => {
       }])
       page.byId('reboot-all').checked = false
       page.byId('reboot-all').fire('change')
-
-      page.byId('save').fire('click')
       await settle()
 
       expect(page.savedOptions()).toEqual({})
     })
 
-    it('does not touch the saved configuration until Save is pressed', async () => {
+    it('does not mutate the live objects getPluginConfig returned', async () => {
       // getPluginConfig hands back live objects, so editing a control in place
       // would change the configuration of a user who then closed the page.
       const block = { ...configured, options: { sliderService: 'fan' } }
@@ -398,12 +406,72 @@ describe('the settings page', () => {
 
     include.checked = false
     include.fire('change')
-    page.byId('save').fire('click')
     await settle()
 
     expect(page.saved()).toEqual([])
     expect(page.toast.error).not.toHaveBeenCalled()
-    expect(page.toast.success).toHaveBeenCalledWith('0 players saved.', 'Saved')
+  })
+
+  it('hides the battery switch unless the player has a pack', async () => {
+    const page = await load([configured])
+
+    expect(page.players().textContent).not.toContain('Battery (')
+    expect(page.players().textContent).not.toContain('no pack fitted')
+  })
+
+  it('offers a battery switch on a player that has a pack', async () => {
+    const request = jest.fn().mockResolvedValue({
+      players: [{
+        id: '90:56:82:0A:00:04:11000',
+        name: 'Portable Speaker',
+        host: '192.168.4.13',
+        port: 11_000,
+        brand: 'Bluesound',
+        model: 'PULSE FLEX 2i',
+        firmware: '4.16.6',
+        fixedVolume: false,
+        hasBattery: true,
+        derivedIdentity: false,
+        suggested: { volumeSlider: true, mute: false, battery: true },
+      }],
+    })
+    const page = await load([], request)
+    page.byId('manual-host').value = '192.168.4.13'
+    page.byId('manual-probe').fire('click')
+    await settle()
+
+    expect(page.players().textContent).toContain('Battery (on the volume or mute tile')
+    expect(page.players().textContent).not.toContain('no pack fitted')
+  })
+
+  it('drops a leftover battery accessory once discovery sees no pack', async () => {
+    const request = jest.fn().mockResolvedValue({
+      players: [{
+        id: configured.devices[0].id,
+        name: 'Zone One',
+        host: '192.168.4.11',
+        port: 11_000,
+        brand: 'NAD',
+        model: 'C658',
+        firmware: '4.16.6',
+        fixedVolume: false,
+        hasBattery: false,
+        derivedIdentity: false,
+        suggested: { volumeSlider: true, mute: false, battery: false },
+      }],
+    })
+    const page = await load([{
+      ...configured,
+      devices: [{ ...configured.devices[0], battery: true }],
+    }], request)
+
+    expect(page.players().textContent).toContain('Battery (on the volume or mute tile')
+
+    page.byId('discover').fire('click')
+    await settle()
+
+    expect(page.players().textContent).not.toContain('Battery (')
+    expect((await saveOne(page)).battery).toBe(false)
   })
 
   it('flags a configured player that discovery no longer finds', async () => {

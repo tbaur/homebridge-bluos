@@ -36,6 +36,8 @@ export declare class VolumeAccessory extends BaseAccessory {
     private fixedVolume;
     /** Level awaiting a coalesced write. */
     private pendingLevel;
+    /** Present when this slider also carries the player's battery. */
+    private readonly battery;
     /** In-flight coalesced write, shared by every handler that queued into it. */
     private flush;
     constructor(init: AccessoryInit);

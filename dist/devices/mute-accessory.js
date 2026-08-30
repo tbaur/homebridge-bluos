@@ -25,11 +25,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MuteAccessory = void 0;
 const utils_1 = require("../utils");
 const base_accessory_1 = require("./base-accessory");
+const player_battery_1 = require("./player-battery");
 /** A mute switch for one player. */
 class MuteAccessory extends base_accessory_1.BaseAccessory {
     service;
     /** Last mute state read from the player. */
     muted;
+    /** Present when this switch also carries the player's battery. */
+    battery;
     constructor(init) {
         super(init);
         const { Characteristic: Char, Service: HapService } = this.host.hap;
@@ -39,6 +42,14 @@ class MuteAccessory extends base_accessory_1.BaseAccessory {
             .getCharacteristic(Char.On)
             .onGet(() => this.readOn())
             .onSet(async (value) => this.writeOn(value));
+        this.battery = (0, player_battery_1.attachHostedBattery)({
+            hap: this.host.hap,
+            accessory: this.accessory,
+            displayName: this.displayName,
+            warnOnce: (key, message) => this.warnOnce(key, message),
+            communicationFailure: () => this.communicationFailure(),
+            hasObservedState: () => this.hasObservedState(),
+        }, this.context.hostsBattery === true);
     }
     readOn() {
         this.requireObservedState();
@@ -63,9 +74,11 @@ class MuteAccessory extends base_accessory_1.BaseAccessory {
     updateFromObservation(observation, _reason) {
         this.muted = observation.muted;
         this.service.updateCharacteristic(this.host.hap.Characteristic.On, observation.muted);
+        this.battery?.apply(observation);
     }
     markUnavailable() {
         this.service.updateCharacteristic(this.host.hap.Characteristic.On, this.communicationFailure());
+        this.battery?.markUnavailable();
     }
 }
 exports.MuteAccessory = MuteAccessory;

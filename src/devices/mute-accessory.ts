@@ -26,6 +26,7 @@ import type { CharacteristicValue, Service } from 'homebridge'
 import type { PlayerObservation, RefreshReason } from '../types'
 import { forLog } from '../utils'
 import { BaseAccessory, type AccessoryInit } from './base-accessory'
+import { attachHostedBattery, PlayerBattery } from './player-battery'
 
 /** A mute switch for one player. */
 export class MuteAccessory extends BaseAccessory {
@@ -33,6 +34,9 @@ export class MuteAccessory extends BaseAccessory {
 
   /** Last mute state read from the player. */
   private muted: boolean | undefined
+
+  /** Present when this switch also carries the player's battery. */
+  private readonly battery: PlayerBattery | undefined
 
   constructor(init: AccessoryInit) {
     super(init)
@@ -43,6 +47,14 @@ export class MuteAccessory extends BaseAccessory {
       .getCharacteristic(Char.On)
       .onGet(() => this.readOn())
       .onSet(async (value) => this.writeOn(value))
+    this.battery = attachHostedBattery({
+      hap: this.host.hap,
+      accessory: this.accessory,
+      displayName: this.displayName,
+      warnOnce: (key, message) => this.warnOnce(key, message),
+      communicationFailure: () => this.communicationFailure(),
+      hasObservedState: () => this.hasObservedState(),
+    }, this.context.hostsBattery === true)
   }
 
   private readOn(): CharacteristicValue {
@@ -76,6 +88,7 @@ export class MuteAccessory extends BaseAccessory {
   ): void {
     this.muted = observation.muted
     this.service.updateCharacteristic(this.host.hap.Characteristic.On, observation.muted)
+    this.battery?.apply(observation)
   }
 
   protected override markUnavailable(): void {
@@ -83,5 +96,6 @@ export class MuteAccessory extends BaseAccessory {
       this.host.hap.Characteristic.On,
       this.communicationFailure(),
     )
+    this.battery?.markUnavailable()
   }
 }

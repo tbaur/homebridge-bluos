@@ -4,25 +4,19 @@
  * Licensed under the Apache License, Version 2.0
  * See LICENSE file for full license text
  *
- * @fileoverview State of charge for a portable player.
+ * @fileoverview Standalone battery accessory, used only when no other tile exists.
  *
- * `/SyncStatus` already carries `<battery level charging/>` on players with a
- * battery pack fitted, so this costs one service and no extra traffic. A player
- * without a pack never reports the element, and the accessory then reports No
- * Response rather than inventing a charge level.
+ * HomeKit will not render this in the Home app. Prefer hosting the Battery
+ * service on the volume or mute accessory, which resolveAccessories does
+ * whenever one of those is enabled. This class remains for a player that
+ * exposes battery and nothing else.
  */
 import type { PlayerObservation, RefreshReason } from '../types';
 import { BaseAccessory, type AccessoryInit } from './base-accessory';
-/** A battery sensor for one player. */
+/** A battery sensor for one player, with no other HomeKit service beside it. */
 export declare class BatteryAccessory extends BaseAccessory {
-    private readonly service;
-    private level;
-    private charging;
+    private readonly battery;
     constructor(init: AccessoryInit);
-    private readLevel;
-    private readLowBattery;
-    private readChargingState;
-    private requireBattery;
     protected updateFromObservation(observation: PlayerObservation, _reason: RefreshReason): void;
     protected markUnavailable(): void;
 }

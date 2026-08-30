@@ -52,5 +52,8 @@ function parseAccessoryContext(accessory) {
     if (Number.isInteger(raw.lastNonZeroVolume)) {
         context.lastNonZeroVolume = raw.lastNonZeroVolume;
     }
+    if (raw.hostsBattery === true) {
+        context.hostsBattery = true;
+    }
     return context;
 }
