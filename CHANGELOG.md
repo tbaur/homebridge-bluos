@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/tbaur/homebridge-bluos/compare/v1.1.0...v1.1.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* keep accessories quiet while a rebooted player comes back ([#24](https://github.com/tbaur/homebridge-bluos/issues/24)) ([dc4f792](https://github.com/tbaur/homebridge-bluos/commit/dc4f7921cb584697e5e49f92ec0207642d88a541))
+
 ## [1.1.0](https://github.com/tbaur/homebridge-bluos/compare/v1.0.3...v1.1.0) (2026-08-30)
 
 
