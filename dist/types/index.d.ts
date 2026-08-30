@@ -18,9 +18,12 @@ export interface PluginLogger {
  * What an accessory does. Part of its identity, and therefore of its UUID.
  *
  * `volume` is the fake slider, `mute` the mute switch, `volumePreset` a
- * one-level switch, and `battery` the state-of-charge sensor for portables.
+ * one-level switch, `battery` the state-of-charge sensor for portables, and
+ * `reboot` a momentary switch that restarts one player. `rebootAll` is the only
+ * kind with no player behind it: it belongs to the platform and restarts every
+ * player it can find.
  */
-export declare const ACCESSORY_KINDS: readonly ["volume", "mute", "volumePreset", "battery"];
+export declare const ACCESSORY_KINDS: readonly ["volume", "mute", "volumePreset", "battery", "reboot", "rebootAll"];
 /** @see ACCESSORY_KINDS */
 export type AccessoryKind = (typeof ACCESSORY_KINDS)[number];
 /** Narrow an unknown value to an {@link AccessoryKind}. */
@@ -62,12 +65,29 @@ export interface BluOSDeviceConfig {
     sliderService?: SliderService;
     mute?: boolean;
     battery?: boolean;
+    reboot?: boolean;
     volumePresets?: VolumePresetConfig[];
 }
 /** Platform-level tuning. */
 export interface BluOSPlatformOptions {
     discoveryTimeoutSec?: number;
     sliderService?: SliderService;
+    /**
+     * Expose one switch that restarts every BluOS player on the network.
+     *
+     * Off by default, and deliberately so: its reach is every player discovery can
+     * see, including ones absent from `devices[]`.
+     */
+    rebootAll?: boolean;
+    /**
+     * What to call that switch in HomeKit.
+     *
+     * Worth configuring rather than deriving, because this is the one accessory
+     * with no room of its own: it belongs to the install, so the only thing that
+     * can put it in a sensible room is a name the user chose. Falls back to the
+     * platform name followed by "Reboot All".
+     */
+    rebootAllName?: string;
 }
 /** Shape of one `platforms[]` entry in `config.json`. */
 export interface BluOSPlatformConfig {
@@ -88,6 +108,7 @@ export interface ResolvedDevice {
     sliderService: SliderService;
     mute: boolean;
     battery: boolean;
+    reboot: boolean;
     volumePresets: VolumePresetConfig[];
 }
 /** One accessory to expose, derived from a {@link ResolvedDevice}. */

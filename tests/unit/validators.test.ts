@@ -20,7 +20,7 @@ import {
   resolveSliderService,
   validateConfig,
 } from '../../src/utils/validators'
-import { DEFAULT_BLUOS_PORT, MAX_NAME_LENGTH } from '../../src/settings'
+import { DEFAULT_BLUOS_PORT, MAX_NAME_LENGTH, PLATFORM_DEVICE_ID } from '../../src/settings'
 import type { ResolvedDevice } from '../../src/types'
 
 const validDevice = {
@@ -41,6 +41,7 @@ function device(overrides: Partial<ResolvedDevice> = {}): ResolvedDevice {
     sliderService: 'fan',
     mute: false,
     battery: false,
+    reboot: false,
     volumePresets: [],
     ...overrides,
   }
@@ -213,6 +214,7 @@ describe('validateConfig', () => {
         sliderService: 'fan',
         mute: false,
         battery: false,
+        reboot: false,
         volumePresets: [],
       },
     ])
@@ -379,6 +381,61 @@ describe('validateConfig', () => {
     expect(result.warnings.join(' ')).toMatch(/nothing will appear in HomeKit/)
   })
 
+  it('counts a reboot switch as something being exposed', () => {
+    const result = validateConfig({
+      platform: 'BluOS',
+      devices: [{ ...validDevice, volumeSlider: false, reboot: true }],
+    })
+
+    expect(result.devices[0]?.reboot).toBe(true)
+    expect(result.warnings.join(' ')).not.toMatch(/nothing will appear in HomeKit/)
+  })
+
+  it('counts the global reboot switch as something being exposed', () => {
+    const result = validateConfig({
+      platform: 'BluOS',
+      devices: [{ ...validDevice, volumeSlider: false }],
+      options: { rebootAll: true },
+    })
+
+    expect(result.options.rebootAll).toBe(true)
+    expect(result.warnings.join(' ')).not.toMatch(/nothing will appear in HomeKit/)
+  })
+
+  it('leaves both reboot switches off unless they are asked for', () => {
+    const result = validateConfig({ platform: 'BluOS', devices: [validDevice] })
+
+    expect(result.devices[0]?.reboot).toBe(false)
+    expect(result.options.rebootAll).toBe(false)
+    expect(result.options.rebootAllName).toBeUndefined()
+  })
+
+  it('carries the name given to the global reboot switch, trimmed', () => {
+    const result = validateConfig({
+      platform: 'BluOS',
+      devices: [validDevice],
+      options: { rebootAll: true, rebootAllName: '  Restart Everything  ' },
+    })
+
+    expect(result.options.rebootAllName).toBe('Restart Everything')
+    expect(result.errors).toEqual([])
+  })
+
+  it('warns and falls back to the default when that name is unusable', () => {
+    // A warning rather than an error: a rejected label should cost the user
+    // their name, not their switch.
+    const result = validateConfig({
+      platform: 'BluOS',
+      devices: [validDevice],
+      options: { rebootAll: true, rebootAllName: 'x'.repeat(100) },
+    })
+
+    expect(result.options.rebootAll).toBe(true)
+    expect(result.options.rebootAllName).toBeUndefined()
+    expect(result.errors).toEqual([])
+    expect(result.warnings.join(' ')).toMatch(/reboot all switch name is longer than/)
+  })
+
   it('carries a model and brand through, sanitised', () => {
     const result = validateConfig({
       platform: 'BluOS',
@@ -483,6 +540,7 @@ describe('resolveAccessories', () => {
       volumeSlider: true,
       mute: true,
       battery: true,
+      reboot: true,
       volumePresets: [{ name: 'Quiet', volume: 15 }],
     })])
 
@@ -490,6 +548,7 @@ describe('resolveAccessories', () => {
       ['volume', 'Zone One Volume'],
       ['mute', 'Zone One Mute'],
       ['battery', 'Zone One Battery'],
+      ['reboot', 'Zone One Reboot'],
       ['volumePreset', 'Quiet'],
     ])
   })
@@ -533,5 +592,43 @@ describe('resolveAccessories', () => {
     })])
 
     expect(accessories.every((entry) => entry.sliderService === 'lightbulb')).toBe(true)
+  })
+
+  it('adds the global reboot switch once, outside any device', () => {
+    const accessories = resolveAccessories(
+      [device({ reboot: true }), device({ id: 'other', reboot: true })],
+      [],
+      { rebootAll: true, name: 'BluOS' },
+    )
+
+    const global = accessories.filter((entry) => entry.kind === 'rebootAll')
+    expect(global).toHaveLength(1)
+    expect(global[0]?.name).toBe('BluOS Reboot All')
+    expect(global[0]?.deviceId).toBe(PLATFORM_DEVICE_ID)
+  })
+
+  it('offers the global reboot switch even with no devices configured', () => {
+    // A network that filters multicast leaves discovery empty, which is exactly
+    // where a manual sweep is the only way to reach anything.
+    const accessories = resolveAccessories([], [], { rebootAll: true, name: 'BluOS' })
+
+    expect(accessories.map((entry) => entry.kind)).toEqual(['rebootAll'])
+  })
+
+  it('leaves the global reboot switch out unless it is asked for', () => {
+    expect(resolveAccessories([device({ reboot: true })], [], { rebootAll: false, name: 'BluOS' }))
+      .toHaveLength(1)
+  })
+
+  it('names the global reboot switch whatever the user called it', () => {
+    // Taken bare rather than suffixed: it is the one accessory with no room of
+    // its own, so the name is the only thing that can place it in one.
+    const accessories = resolveAccessories([], [], {
+      rebootAll: true,
+      rebootAllName: 'Restart Everything',
+      name: 'BluOS',
+    })
+
+    expect(accessories[0]?.name).toBe('Restart Everything')
   })
 })

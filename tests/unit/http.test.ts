@@ -14,7 +14,7 @@
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
 
-import { httpGet } from '../../src/api/http'
+import { httpGet, httpPost } from '../../src/api/http'
 import { ConnectionError, ProtocolError } from '../../src/utils/errors'
 
 interface Server {
@@ -180,5 +180,93 @@ describe('httpGet', () => {
     await expect(httpGet(server.url(), { ...limits, signal }))
       .rejects.toThrow(/aborted before it started/)
     expect(server.connections).toBe(0)
+  })
+})
+
+describe('httpPost', () => {
+  let server: Server | undefined
+
+  afterEach(async () => {
+    await server?.close()
+    server = undefined
+  })
+
+  /** Start a server that echoes back what it was sent. */
+  async function echo(): Promise<Server> {
+    return start((request, response) => {
+      let body = ''
+      request.setEncoding('utf8')
+      request.on('data', (chunk: string) => {
+        body += chunk
+      })
+      request.on('end', () => {
+        response.writeHead(200, { 'content-type': 'text/plain' })
+        response.end(JSON.stringify({
+          method: request.method,
+          contentType: request.headers['content-type'],
+          contentLength: request.headers['content-length'],
+          body,
+        }))
+      })
+    })
+  }
+
+  it('sends a form-encoded body with an explicit length', async () => {
+    // Explicit rather than chunked: a player's minimal HTTP server is likelier
+    // to handle a plain body than a chunked one.
+    server = await echo()
+
+    const response = await httpPost(server.url('/reboot'), { yes: '1' }, limits)
+
+    expect(JSON.parse(response.body)).toEqual({
+      method: 'POST',
+      contentType: 'application/x-www-form-urlencoded',
+      contentLength: '5',
+      body: 'yes=1',
+    })
+  })
+
+  it('encodes values so one cannot break out of its field', async () => {
+    server = await echo()
+
+    const response = await httpPost(server.url('/reboot'), { yes: '1&admin=1' }, limits)
+
+    expect(JSON.parse(response.body).body).toBe('yes=1%26admin%3D1')
+  })
+
+  it('reports a non-200 status rather than throwing', async () => {
+    server = await start((_request, response) => {
+      response.writeHead(404)
+      response.end('nope')
+    })
+
+    await expect(httpPost(server.url('/reboot'), { yes: '1' }, limits))
+      .resolves.toMatchObject({ status: 404 })
+  })
+
+  it('does not claim delivery when it never connected', async () => {
+    // The distinction reboot depends on: nothing was sent, so nothing rebooted.
+    const failure = await httpPost('http://127.0.0.1:1/reboot', { yes: '1' }, limits)
+      .catch((error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(ConnectionError)
+    expect((failure as ConnectionError).delivered).toBe(false)
+  })
+
+  it('reports delivery when the player took the request and then dropped the socket', async () => {
+    // What a rebooting player does: accepts the request, then dies before it can
+    // answer. The plugin reads that as success.
+    server = await start((request) => {
+      request.on('end', () => {
+        request.socket.destroy()
+      })
+      request.resume()
+    })
+
+    const failure = await httpPost(server.url('/reboot'), { yes: '1' }, limits)
+      .catch((error: unknown) => error)
+
+    expect(failure).toBeInstanceOf(ConnectionError)
+    expect((failure as ConnectionError).delivered).toBe(true)
   })
 })

@@ -14,7 +14,7 @@
  *    clients, and phrases it as a requirement rather than advice.
  * 2. At least 100 ms between control calls to one endpoint, so a HomeKit scene
  *    that touches several tiles at once cannot burst a player.
- * 3. Writes to one chassis are serialised. A NAD CI-S2 or CI 580 exposes several
+ * 3. Writes to one chassis are serialised. A NAD CI S2 or CI 580 exposes several
  *    zones on one IP; concurrent writes to `:11000` and `:11010` are writes to
  *    the same box. Different chassis still run in parallel.
  *
@@ -31,6 +31,9 @@ import {
   LONG_POLL_READ_SLACK_MS,
   LONG_POLL_SEC,
   MAX_XML_BYTES,
+  REBOOT_FORM,
+  REBOOT_RESOURCE,
+  REBOOT_TIMEOUT_MS,
   SAME_RESOURCE_MIN_GAP_MS,
   STATUS_TIMEOUT_MS,
   VOLUME_MAX,
@@ -40,7 +43,12 @@ import type { PlayerObservation, PluginLogger } from '../types'
 import { ConnectionError, ProtocolError } from '../utils/errors'
 import { sleep as realSleep } from '../utils/timing'
 import { isValidHost } from '../utils/validators'
-import { httpGet as defaultHttpGet, type HttpGet } from './http'
+import {
+  httpGet as defaultHttpGet,
+  httpPost as defaultHttpPost,
+  type HttpGet,
+  type HttpPost,
+} from './http'
 import { formatEndpoint } from './identity'
 import { parseSyncStatus, parseVolume, type VolumeResult } from './sync-status'
 
@@ -64,10 +72,24 @@ export interface WriteScope {
   tellSlaves: boolean
 }
 
+/**
+ * What a reboot request produced.
+ *
+ * `acknowledged` is false when the player took the request and then stopped
+ * answering, which is a success rather than a failure — see
+ * {@link BluOSClient.reboot}. It is carried so the log can say which happened,
+ * because "sent, no answer" and "sent, answered" look identical to the user and
+ * only one of them is worth investigating if the player never comes back.
+ */
+export interface RebootResult {
+  acknowledged: boolean
+}
+
 /** Injectable collaborators, so tests need neither sockets nor real clocks. */
 export interface BluOSClientOptions {
   log: PluginLogger
   httpGet?: HttpGet
+  httpPost?: HttpPost
   now?: () => number
   sleep?: (ms: number) => Promise<void>
 }
@@ -82,6 +104,8 @@ export class BluOSClient {
   private readonly log: PluginLogger
 
   private readonly httpGet: HttpGet
+
+  private readonly httpPost: HttpPost
 
   private readonly now: () => number
 
@@ -99,6 +123,7 @@ export class BluOSClient {
   constructor(options: BluOSClientOptions) {
     this.log = options.log
     this.httpGet = options.httpGet ?? defaultHttpGet
+    this.httpPost = options.httpPost ?? defaultHttpPost
     this.now = options.now ?? Date.now
     this.sleep = options.sleep ?? realSleep
   }
@@ -201,6 +226,56 @@ export class BluOSClient {
     })
   }
 
+  /**
+   * Restart the box at an address.
+   *
+   * Takes a host and no port, which is the whole story about this call. `/reboot`
+   * is served on port 80 alongside `/diagnostics`, and the control ports answer
+   * 404 for it. Port 80 is one server per chassis, so this restarts every zone
+   * behind the address and cannot be aimed at one zone of a CI S2, however much
+   * the rest of the API is per zone. See docs/PROTOCOL.md.
+   *
+   * Deliberately outside {@link withChassisLock}, unlike every other write. That
+   * lock protects one address from concurrent volume and mute traffic, which is
+   * rapid and repeated; a reboot is one request per address per press. Holding
+   * the lock would only mean that a box which dies mid-response makes anything
+   * queued behind it wait out the whole timeout. `respectResourceGap` still
+   * paces repeat presses, keyed on the same address.
+   *
+   * A lost connection counts as success once the request reached the player.
+   * This is the one call where that is right rather than reckless: a player that
+   * is restarting cannot finish answering, so insisting on a clean response would
+   * report failure precisely when the command worked. A failure to connect at all
+   * is still a failure, which is the distinction {@link ConnectionError.delivered}
+   * exists to draw.
+   */
+  async reboot(host: string): Promise<RebootResult> {
+    if (!isValidHost(host)) {
+      throw new ConnectionError(`refusing to contact an invalid host: ${JSON.stringify(host)}`)
+    }
+    await this.respectResourceGap(`${host}|${REBOOT_RESOURCE}`)
+    const url = `http://${host}/${REBOOT_RESOURCE}`
+    this.log.debug(`POST ${url}`)
+
+    try {
+      const response = await this.httpPost(url, { ...REBOOT_FORM }, {
+        connectTimeoutMs: CONNECT_TIMEOUT_MS,
+        totalTimeoutMs: REBOOT_TIMEOUT_MS,
+        maxBytes: MAX_XML_BYTES,
+      })
+      if (response.status !== 200) {
+        throw new ProtocolError(`reboot on ${host} answered HTTP ${response.status}`)
+      }
+      return { acknowledged: true }
+    } catch (error) {
+      if (error instanceof ConnectionError && error.delivered) {
+        this.log.debug(`${host} stopped answering after the reboot request, which is expected`)
+        return { acknowledged: false }
+      }
+      throw error
+    }
+  }
+
   private async control(
     endpoint: Endpoint,
     query: Record<string, string>,
@@ -262,6 +337,24 @@ export class BluOSClient {
     this.lastResourceRequest.set(key, this.now())
   }
 
+  /**
+   * Validate the host and wait out the same-resource gap, then name the target.
+   *
+   * Shared by every request whatever its method, so a new call path cannot
+   * forget either. The host check especially: two copies of the one defence
+   * against a configuration or cache value altering a request URL would
+   * eventually disagree, and the disagreement would be the security regression.
+   * It is the same check the settings page and the configuration validator apply.
+   */
+  private async prepare(endpoint: Endpoint, resource: string): Promise<string> {
+    const target = formatEndpoint(endpoint.host, endpoint.port)
+    if (!isValidHost(endpoint.host)) {
+      throw new ConnectionError(`refusing to contact an invalid host: ${JSON.stringify(endpoint.host)}`)
+    }
+    await this.respectResourceGap(`${target}|${resource}`)
+    return target
+  }
+
   private async get(request: {
     endpoint: Endpoint
     resource: string
@@ -270,16 +363,7 @@ export class BluOSClient {
     signal?: AbortSignal
   }): Promise<string> {
     const { endpoint, resource, query, totalTimeoutMs, signal } = request
-    const target = formatEndpoint(endpoint.host, endpoint.port)
-    // The same check the settings page and the configuration validator apply.
-    // Shared rather than restated: two copies of the one defence against a
-    // configuration or cache value altering a request URL would eventually
-    // disagree, and the disagreement would be the security regression.
-    if (!isValidHost(endpoint.host)) {
-      throw new ConnectionError(`refusing to contact an invalid host: ${JSON.stringify(endpoint.host)}`)
-    }
-
-    await this.respectResourceGap(`${target}|${resource}`)
+    const target = await this.prepare(endpoint, resource)
 
     const search = new URLSearchParams(query).toString()
     const url = `http://${target}/${resource}${search.length > 0 ? `?${search}` : ''}`

@@ -2,7 +2,7 @@
 
 Tools for the things CI cannot do: talk to real BluOS hardware. They are not part of the published package (`files` in `package.json` excludes this directory) and they are not part of the test suite.
 
-Everything here loads the compiled plugin from `dist/`, so that a result says something about the code that actually ships rather than about a reimplementation of the protocol. Run `npm run build` first.
+Everything here loads the compiled plugin from `dist/`, so a result says something about the code that actually ships, not about a reimplementation of the protocol. Run `npm run build` first.
 
 No script has a built-in address, MAC or player name. Targets come from the command line or from mDNS discovery, and anything captured is written where you ask for it.
 
@@ -12,8 +12,11 @@ No script has a built-in address, MAC or player name. Targets come from the comm
 | `grouping.js` | No | Compare how firmware reports grouping against the role the plugin derives |
 | `capture-fixture.js` | No | Record raw `/SyncStatus` and `/Volume` XML for use as a test fixture |
 | `pseudonymise.js` | No | Rewrite a capture's real values, then prove none survived |
+| `reboot.js` | **Yes, it reboots it** | Establish how reboot is addressed, and whether a given request form does anything at all |
 
-None of them call a control endpoint, so none can change a volume, a mute state or a group. To capture a particular state, set it in the BluOS app first.
+Every script except `reboot.js` is read-only: none of them call a control endpoint, so none can change a volume, a mute state or a group. To capture a particular state, set it in the BluOS app first.
+
+`reboot.js` is the exception, and it is destructive: it restarts hardware and interrupts playback. It never discovers its own targets, requires an explicit `--host`, and refuses to send anything without `--confirm`.
 
 ## Before a release
 
@@ -34,6 +37,39 @@ Discovery should find every zone, identities should be unique (including across 
 3. The leader should report `slave` elements and `role=primary`; each follower a `master` and `role=secondary`; everything else no grouping elements at all
 
 If the two columns disagree, capture the raw body and fix `readSyncRole` in `src/api/sync-status.ts`. The third case matters as much as the first two: a paired Bluesound speaker carries `zoneMaster="true"` in `<zoneOptions>`, and anything reading that as a group would send a lone speaker's writes to a group that does not exist.
+
+## Verifying reboot
+
+Reboot is the only BluOS command that is a POST instead of a GET, and the only one addressed without a BluOS port. The findings this script produced are recorded in [docs/PROTOCOL.md](../docs/PROTOCOL.md). It stays here so you can re-check them on other models and firmware.
+
+Half the question needs no reboot at all. A plain `GET` shows which paths exist on which ports:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://192.168.4.14/reboot        # 200
+curl -s -o /dev/null -w '%{http_code}\n' http://192.168.4.14:11010/reboot  # 404
+```
+
+Start there. Only reach for the destructive run to confirm that a request actually restarts the box:
+
+```bash
+npm run build
+node scripts/reboot.js --host 192.168.4.14:11010 --variant hard-noport --watch 11000,11010 --confirm
+```
+
+Four variants, one per run, so nothing is ambiguous about which request caused what:
+
+| Variant | Request | On 4.16.22 |
+| --- | --- | --- |
+| `hard-noport` | `POST http://host/reboot` body `noheader=0&yes=1` | Reboots the box |
+| `hard-port` | `POST http://host:port/reboot` body `noheader=0&yes=1` | 404, no such path on the control port |
+| `soft-port` | `POST http://host:port/Reboot` body `soft=1` | 404 |
+| `soft-noport` | `POST http://host/Reboot` body `soft=1` | 404, `/Reboot` does not exist |
+
+The arbiter is uptime, scraped from `/diagnostics`, because a request that returns 200 while uptime keeps running has done nothing and a "reboot" that does nothing must not ship. Two subtleties the script handles, each of which otherwise yields a confident wrong answer: uptime is compared as a number, since it climbs while the probe watches and only a *decrease* is a restart; and the reading afterwards is retried, since port 80 comes back later than the control ports and a single read reports "unknown", which is not "unchanged".
+
+`--watch` polls `/SyncStatus` on each named port throughout, which is what would reveal a sibling zone surviving if a firmware ever made reboot per zone.
+
+Record anything new in [docs/PROTOCOL.md](../docs/PROTOCOL.md), including any variant that turns out to be inert. A documented dead end saves the next person from rediscovering it.
 
 ## Capturing a fixture
 
@@ -64,9 +100,9 @@ A JSON file of *your* real values, so it must never be committed. Keep it outsid
 
 Left-hand values are literal strings from your own capture; the placeholders above are only there because this file is published and your values must not be.
 
-Substitutions are applied longest-first, so no replacement can be a prefix of another. Replace like with like — an address for an address, a MAC for a MAC of the same vendor prefix — so the shapes the parser is tested against stay realistic.
+Substitutions are applied longest-first, so no replacement can be a prefix of another. Replace like with like: an address for an address, a MAC for a MAC of the same vendor prefix. That keeps the shapes the parser is tested against realistic.
 
-Afterwards the script lists every MAC and IP address still present in the output and fails if any mapped value survived. Only you can tell whether a remaining value is fictional, so read that list rather than trusting the exit code.
+Afterwards the script lists every MAC and IP address still present in the output and fails if any mapped value survived. Only you can tell whether a remaining value is fictional, so read that list. Do not trust the exit code on its own.
 
 ```bash
 # Audit what is already committed, without rewriting anything:

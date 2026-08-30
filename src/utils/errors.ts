@@ -82,10 +82,22 @@ export class ProtocolError extends Error {
   }
 }
 
-/** Raised when a player cannot be reached at all. */
+/**
+ * Raised when a player cannot be reached at all.
+ *
+ * `delivered` records whether the request had already been written to the socket
+ * when the failure happened, which separates "the player never heard us" from
+ * "the player heard us and then stopped talking". It matters for exactly one
+ * caller: a reboot request that went out and then lost its connection has almost
+ * certainly succeeded, because a player that is restarting is a player that
+ * cannot finish answering. Every other call treats both alike.
+ */
 export class ConnectionError extends Error {
-  constructor(message: string, options?: { cause?: unknown }) {
+  readonly delivered: boolean
+
+  constructor(message: string, options?: { cause?: unknown; delivered?: boolean }) {
     super(message, options)
     this.name = 'ConnectionError'
+    this.delivered = options?.delivered === true
   }
 }

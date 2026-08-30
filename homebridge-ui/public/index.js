@@ -79,9 +79,14 @@
     if (!Array.isArray(platformConfig.devices)) {
       platformConfig.devices = []
     }
-    if (typeof platformConfig.options !== 'object' || platformConfig.options === null) {
-      platformConfig.options = {}
-    }
+    // Copied rather than aliased: `getPluginConfig` hands back the live objects,
+    // and editing a control should not change the saved configuration until the
+    // user presses Save. `devices` is already rebuilt from scratch on save, so
+    // this closes the same gap for the install-wide settings.
+    platformConfig.options = typeof platformConfig.options === 'object' && platformConfig.options !== null
+      ? Object.assign({}, platformConfig.options)
+      : {}
+    loadPlatformOptions()
 
     // Configured players are shown even before discovery runs, so a user can
     // adjust an existing setup without waiting for the network.
@@ -105,6 +110,7 @@
         volumeSlider: device.volumeSlider !== false,
         mute: device.mute === true,
         battery: device.battery === true,
+        reboot: device.reboot === true,
         presets: Array.isArray(device.volumePresets)
           ? device.volumePresets.filter((preset) => preset && typeof preset.name === 'string')
             .map((preset) => ({ name: preset.name, volume: Number(preset.volume) || 0 }))
@@ -152,6 +158,7 @@
         volumeSlider: player.suggested.volumeSlider,
         mute: player.suggested.mute,
         battery: player.suggested.battery,
+        reboot: player.suggested.reboot,
         presets: [],
         saved: undefined,
       })
@@ -172,6 +179,7 @@
         volumeSlider: player.volumeSlider === true,
         mute: player.mute === true,
         battery: player.battery === true,
+        reboot: player.reboot === true,
       })
       if (player.brand) {
         device.brand = player.brand
@@ -197,9 +205,44 @@
     return devices
   }
 
+  /** Show the saved install-wide settings, and reveal the name field if used. */
+  function loadPlatformOptions() {
+    byId('reboot-all').checked = platformConfig.options.rebootAll === true
+    const name = platformConfig.options.rebootAllName
+    byId('reboot-all-name').value = typeof name === 'string' ? name : ''
+    refreshRebootAllName()
+  }
+
+  /** The name only means anything while the switch exists. */
+  function refreshRebootAllName() {
+    byId('reboot-all-name-row').hidden = byId('reboot-all').checked !== true
+  }
+
+  /**
+   * Fold the install-wide settings back into the configuration.
+   *
+   * An empty name removes the key rather than saving a blank one, so the plugin
+   * falls back to its default instead of registering an unnamed accessory.
+   */
+  function applyPlatformOptions() {
+    const enabled = byId('reboot-all').checked === true
+    const name = byId('reboot-all-name').value.trim()
+    if (enabled) {
+      platformConfig.options.rebootAll = true
+    } else {
+      delete platformConfig.options.rebootAll
+    }
+    if (enabled && name.length > 0) {
+      platformConfig.options.rebootAllName = name
+    } else {
+      delete platformConfig.options.rebootAllName
+    }
+  }
+
   async function save() {
     const devices = toDevices()
     platformConfig.devices = devices
+    applyPlatformOptions()
     try {
       await homebridge.updatePluginConfig([platformConfig])
       await homebridge.savePluginConfig()
@@ -334,6 +377,12 @@
       !player.hasBattery,
       (value) => { player.battery = value },
     ))
+    options.append(checkbox(
+      'Reboot switch (restarts this player, and any zone sharing its box)',
+      player.reboot,
+      false,
+      (value) => { player.reboot = value },
+    ))
     card.append(options)
 
     if (player.selected) {
@@ -349,9 +398,13 @@
       tiles += device.volumeSlider ? 1 : 0
       tiles += device.mute ? 1 : 0
       tiles += device.battery ? 1 : 0
+      tiles += device.reboot ? 1 : 0
       tiles += Array.isArray(device.volumePresets) ? device.volumePresets.length : 0
     }
-    byId('summary').textContent = devices.length === 0
+    // Counted even with no players: it belongs to the install, and it is the one
+    // accessory that still does something when `devices[]` is empty.
+    tiles += byId('reboot-all').checked === true ? 1 : 0
+    byId('summary').textContent = devices.length === 0 && tiles === 0
       ? 'Nothing selected.'
       : `${devices.length} player(s), ${tiles} HomeKit accessory(s).`
     byId('save').disabled = false
@@ -446,6 +499,10 @@
   byId('discover').addEventListener('click', () => void discover())
   byId('manual-probe').addEventListener('click', () => void probe())
   byId('save').addEventListener('click', () => void save())
+  byId('reboot-all').addEventListener('change', () => {
+    refreshRebootAllName()
+    refreshSummary()
+  })
   byId('toggle-manual').addEventListener('click', () => {
     const panel = byId('manual')
     panel.hidden = !panel.hidden

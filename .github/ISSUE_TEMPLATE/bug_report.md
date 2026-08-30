@@ -15,7 +15,7 @@ A clear description of what the bug is.
 - **Homebridge version**:
 - **Node.js version**:
 - **Operating system**:
-- **Player model(s)**: e.g. NAD C658, Bluesound PULSE M, NAD CI-S2 zone 2
+- **Player model(s)**: e.g. NAD C658, Bluesound PULSE M, NAD CI S2 zone 2
 - **BluOS firmware version**: shown in the BluOS app, or in a `/SyncStatus` response
 - **Accessories affected**: volume slider / mute / volume preset / battery
 

@@ -36,13 +36,18 @@ import type { VolumeResult } from './api/sync-status'
 import {
   BatteryAccessory,
   MuteAccessory,
+  RebootAccessory,
+  RebootAllAccessory,
   VolumeAccessory,
   VolumePresetAccessory,
   type AccessoryHost,
   type BaseAccessory,
+  type RebootTarget,
 } from './devices'
 import { DevicePoller } from './poller'
 import {
+  DEFAULT_BLUOS_PORT,
+  PLATFORM_DEVICE_ID,
   PLATFORM_NAME,
   PLUGIN_NAME,
   UUID_PREFIX,
@@ -190,6 +195,85 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
     this.api.updatePlatformAccessories([...this.active.values()])
   }
 
+  /**
+   * Every address the global reboot switch should restart.
+   *
+   * Keyed on host alone, not host and port. Reboot is served on port 80, which is
+   * one server per chassis, so the two zones of a CI S2 are one target: sending
+   * twice would only aim a second request at a box already going down. Each
+   * target carries every player behind it so the log can name what is really
+   * about to stop.
+   *
+   * The union of what is configured and what mDNS answers for. Both halves are
+   * needed: discovery alone does nothing on a network that filters multicast,
+   * which is the case the manual-address fallback exists for, and the configured
+   * list alone would miss the players this switch is advertised as reaching.
+   *
+   * Configured players are added first so their names win. A user who called a
+   * player "Kitchen" in the plugin settings should read "Kitchen" in the log, not
+   * whatever it is called in the BluOS app.
+   *
+   * A failed sweep degrades to the configured list rather than failing the press,
+   * because rebooting the boxes we are sure of beats rebooting none of them.
+   */
+  async rebootTargets(): Promise<readonly RebootTarget[]> {
+    const byHost = new Map<string, string[]>()
+    const add = (host: string, name: string): void => {
+      const names = byHost.get(host)
+      if (names === undefined) {
+        byHost.set(host, [name])
+      } else if (!names.includes(name)) {
+        names.push(name)
+      }
+    }
+
+    const configured = new Set<string>()
+    for (const device of this.devices) {
+      configured.add(device.id)
+      // The poller's address when there is one: it tracks re-addressing, so it
+      // is fresher than what configuration last recorded.
+      add(this.endpointFor(device.id)?.host ?? device.host, device.name)
+    }
+
+    try {
+      for (const player of await this.discovery.discover(this.discoveryTimeoutSec)) {
+        // Skipped by identity rather than by address: a configured player is
+        // usually called something else in the BluOS app, and matching on the
+        // address alone would list the same player twice under both names.
+        if (!configured.has(player.id)) {
+          add(player.host, player.name)
+        }
+      }
+    } catch (error) {
+      this.log.warn(
+        'reboot all could not sweep the network for players: '
+        + `${describeError(error)}. Rebooting the configured players only`,
+      )
+    }
+
+    return [...byHost].map(([host, names]) => ({ host, names }))
+  }
+
+  /**
+   * Other configured players that share an address with this one.
+   *
+   * They will go down with it, because reboot cannot be aimed at one zone of a
+   * chassis. Configured players only: a zone the user never exposed still
+   * restarts, but naming it would mean reporting on equipment this plugin was
+   * not asked to manage.
+   */
+  playersSharingAddress(deviceId: string): readonly string[] {
+    const subject = this.devices.find((device) => device.id === deviceId)
+    if (subject === undefined) {
+      return []
+    }
+    const host = this.endpointFor(deviceId)?.host ?? subject.host
+    return this.devices
+      .filter((device) => device.id !== deviceId
+        && (this.endpointFor(device.id)?.host ?? device.host) === host)
+      .map((device) => device.name)
+  }
+
   // --- Lifecycle ------------------------------------------------------------
 
   private start(): void {
@@ -216,7 +300,16 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
 
     this.devices = result.devices
     const accessoryWarnings: string[] = []
-    const wanted = resolveAccessories(this.devices, accessoryWarnings)
+    const wanted = resolveAccessories(this.devices, accessoryWarnings, {
+      rebootAll: result.options.rebootAll,
+      rebootAllName: result.options.rebootAllName,
+      // Falls back to the platform alias, which is what the Homebridge form
+      // pre-fills, so the switch is named rather than blank on a hand-written
+      // config that omitted `name`.
+      name: typeof this.config.name === 'string' && this.config.name.trim().length > 0
+        ? this.config.name.trim()
+        : PLATFORM_NAME,
+    })
     for (const warning of accessoryWarnings) {
       this.log.warn(warning)
     }
@@ -266,9 +359,11 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
       const uuid = this.uuidFor(accessory)
       // Every wanted accessory was expanded from one of these devices, so a miss
       // is impossible rather than merely unlikely; the map exists to keep startup
-      // linear in accessory count.
+      // linear in accessory count. The exception is the platform's own reboot
+      // switch, which has no device behind it; anything else missing a device is
+      // a bug, and skipping it beats registering something nothing can drive.
       const device = byId.get(accessory.deviceId)
-      if (device === undefined) {
+      if (device === undefined && accessory.deviceId !== PLATFORM_DEVICE_ID) {
         continue
       }
       const existing = this.restored.get(uuid) ?? this.findByIdentity(accessory, claimed)
@@ -319,7 +414,7 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
   private createAccessory(
     uuid: string,
     accessory: ResolvedAccessory,
-    device: ResolvedDevice,
+    device: ResolvedDevice | undefined,
   ): void {
     this.log.info(`adding ${forLog(accessory.name)}`)
     const platformAccessory = new this.api.platformAccessory(accessory.name, uuid)
@@ -338,7 +433,7 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
     existing: PlatformAccessory,
     expectedUuid: string,
     accessory: ResolvedAccessory,
-    device: ResolvedDevice,
+    device: ResolvedDevice | undefined,
   ): void {
     const adopted = existing.UUID !== expectedUuid
     const alreadyAdopted = (existing.context as Partial<AccessoryContext>).adoptedLegacyUuid === true
@@ -373,7 +468,7 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
 
   private buildContext(input: {
     accessory: ResolvedAccessory
-    device: ResolvedDevice
+    device: ResolvedDevice | undefined
     serialNumber: string
     adoptedLegacyUuid: boolean
   }): AccessoryContext {
@@ -381,13 +476,16 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
     const previous = this.restored.get(this.uuidFor(accessory))?.context as
       | Partial<AccessoryContext>
       | undefined
+    // The platform's own switch has no device, and so no address: its host and
+    // port are placeholders that nothing reads, because it resolves its targets
+    // when it is pressed rather than holding one endpoint.
     const context: AccessoryContext = {
       kind: accessory.kind,
       deviceId: accessory.deviceId,
-      host: device.host,
-      port: device.port,
-      brand: device.brand ?? 'BluOS',
-      model: device.model ?? 'BluOS Player',
+      host: device?.host ?? '',
+      port: device?.port ?? DEFAULT_BLUOS_PORT,
+      brand: device?.brand ?? 'BluOS',
+      model: device?.model ?? 'BluOS Player',
       serialNumber,
       adoptedLegacyUuid,
       sliderService: accessory.sliderService,
@@ -437,6 +535,12 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
         break
       case 'battery':
         handler = new BatteryAccessory(init)
+        break
+      case 'reboot':
+        handler = new RebootAccessory(init)
+        break
+      case 'rebootAll':
+        handler = new RebootAllAccessory(init)
         break
     }
     const group = this.handlers.get(context.deviceId) ?? []

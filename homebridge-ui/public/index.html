@@ -78,6 +78,28 @@
 
 <div id="players"></div>
 
+<div class="bluos-card">
+  <div class="bluos-card-head">
+    <div class="bluos-card-title">Whole install</div>
+  </div>
+  <div class="bluos-options">
+    <label class="mb-0">
+      <input type="checkbox" id="reboot-all" />
+      Reboot All switch
+    </label>
+  </div>
+  <div class="bluos-meta">
+    Restarts every BluOS player it can find on the network, including any not listed above.
+    Off by default.
+  </div>
+  <div class="form-group mt-2 mb-0" id="reboot-all-name-row" hidden>
+    <label for="reboot-all-name" style="font-size: .8rem;">Name in the Home app</label>
+    <input type="text" class="form-control form-control-sm" id="reboot-all-name"
+           maxlength="64" placeholder="BluOS Reboot All" />
+    <div class="bluos-meta">Name it for the room you want to keep it in.</div>
+  </div>
+</div>
+
 <div class="bluos-actions">
   <button class="btn btn-success" id="save" disabled>Save</button>
   <span class="spacer"></span>

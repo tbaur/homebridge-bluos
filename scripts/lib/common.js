@@ -144,6 +144,92 @@ function getRaw(endpoint, pathname, timeoutMs = 5000) {
   })
 }
 
+/**
+ * GET a URL, reporting failure as a value rather than as a rejection.
+ *
+ * A probe needs a 404 or a refused connection as *data*: those are the answers
+ * that tell one candidate endpoint apart from another. `getRaw` rejects on both,
+ * which is right when a caller wanted the bytes and wrong when it wanted to know
+ * what happened.
+ */
+function tryGet(url, timeoutMs = 2000) {
+  return new Promise((resolve) => {
+    const request = http.get(url, { agent: false, timeout: timeoutMs }, (response) => {
+      let body = ''
+      response.setEncoding('utf8')
+      response.on('data', (chunk) => {
+        body += chunk
+      })
+      response.on('end', () => resolve({
+        ok: response.statusCode === 200,
+        status: response.statusCode,
+        body,
+      }))
+      response.on('error', (error) => resolve({ ok: false, error: error.message }))
+    })
+    request.on('timeout', () => request.destroy(new Error(`timed out after ${timeoutMs}ms`)))
+    request.on('error', (error) => resolve({ ok: false, error: error.message }))
+  })
+}
+
+/**
+ * POST a form-encoded body, classifying the outcome instead of throwing.
+ *
+ * Three outcomes are distinguished because a rebooting player can produce any of
+ * them, and which one it produces is what decides how the plugin's client must
+ * treat a lost connection:
+ *
+ * - `answered` — a complete response arrived
+ * - `closed-early` — the request went out, then the socket died mid-response,
+ *   which for a reboot most likely means it worked
+ * - `failed` — nothing was ever sent
+ */
+function postForm(url, form, timeoutMs = 5000) {
+  const body = new URLSearchParams(form).toString()
+  const started = Date.now()
+  return new Promise((resolve) => {
+    const request = http.request(
+      url,
+      {
+        method: 'POST',
+        agent: false,
+        timeout: timeoutMs,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      (response) => {
+        let text = ''
+        response.setEncoding('utf8')
+        response.on('data', (chunk) => {
+          text += chunk
+        })
+        response.on('end', () => resolve({
+          outcome: 'answered',
+          status: response.statusCode,
+          body: text,
+          elapsedMs: Date.now() - started,
+        }))
+        response.on('error', (error) => resolve({
+          outcome: 'closed-early',
+          status: response.statusCode,
+          body: text,
+          error: error.message,
+          elapsedMs: Date.now() - started,
+        }))
+      },
+    )
+    request.on('timeout', () => request.destroy(new Error(`timed out after ${timeoutMs}ms`)))
+    request.on('error', (error) => resolve({
+      outcome: 'failed',
+      error: error.message,
+      elapsedMs: Date.now() - started,
+    }))
+    request.end(body)
+  })
+}
+
 /** Discover zones, or resolve the single endpoint the caller named. */
 async function targetsFrom(flags, api, log) {
   const client = new api.BluOSClient({ log })
@@ -198,9 +284,11 @@ module.exports = {
   intFlag,
   parseEndpoint,
   parseFlags,
+  postForm,
   requireBuild,
   run,
   sleep,
   slug,
   targetsFrom,
+  tryGet,
 }

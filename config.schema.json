@@ -4,7 +4,7 @@
   "singular": true,
   "customUi": true,
   "customUiPath": "./homebridge-ui",
-  "headerDisplay": "Exposes BluOS players to HomeKit as a volume slider, a mute switch, volume-preset switches and a battery sensor. Verified on NAD and Bluesound hardware; other BluOS brands run the same firmware and are expected to work. Use **Discover Players** to find zones on your network; every field below can also be edited by hand.",
+  "headerDisplay": "Exposes BluOS players to HomeKit as a volume slider, a mute switch, volume-preset switches, a battery sensor and a reboot switch. Verified on NAD and Bluesound hardware; other BluOS brands run the same firmware and are expected to work. Use **Discover Players** to find zones on your network; every field below can also be edited by hand.",
   "footerDisplay": "HomeKit has no speaker volume control that the Home app renders, so the volume slider is exposed as a fan. See the [documentation](https://github.com/tbaur/homebridge-bluos#readme) for what this plugin does and does not do.",
   "schema": {
     "type": "object",
@@ -25,8 +25,8 @@
             "type": "string",
             "default": "fan",
             "oneOf": [
-              { "title": "Fan — recommended", "enum": ["fan"] },
-              { "title": "Lightbulb — affected by \"turn off all the lights\"", "enum": ["lightbulb"] }
+              { "title": "Fan (recommended)", "enum": ["fan"] },
+              { "title": "Lightbulb (affected by \"turn off all the lights\")", "enum": ["lightbulb"] }
             ],
             "description": "Both render an identical slider. A lightbulb is swept up by Siri commands aimed at lights, which can silence or max out your speakers."
           },
@@ -37,6 +37,22 @@
             "minimum": 1,
             "maximum": 30,
             "description": "How long to listen for players. Raise it on a busy or slow network."
+          },
+          "rebootAll": {
+            "title": "Reboot All Switch",
+            "type": "boolean",
+            "default": false,
+            "description": "One switch that restarts every BluOS player it can find. Its reach is the whole network, not just the players listed below: pressing it also restarts players you have deliberately left out of this configuration. Every player is named in the Homebridge log before anything is sent."
+          },
+          "rebootAllName": {
+            "title": "Reboot All Name",
+            "type": "string",
+            "maxLength": 64,
+            "placeholder": "BluOS Reboot All",
+            "description": "What the switch is called in the Home app, so you can keep it in the room you want. Leave it empty to use the plugin name followed by \"Reboot All\".",
+            "condition": {
+              "functionBody": "return model.options && model.options.rebootAll === true;"
+            }
           }
         }
       },
@@ -60,7 +76,7 @@
               "title": "Name",
               "type": "string",
               "maxLength": 64,
-              "description": "The room's name. Accessories are named from it: \"Study\" gives \"Study Volume\", \"Study Mute\" and \"Study Battery\"."
+              "description": "The room's name. Accessories are named from it: \"Study\" gives \"Study Volume\", \"Study Mute\", \"Study Battery\" and \"Study Reboot\"."
             },
             "host": {
               "title": "Address",
@@ -76,7 +92,7 @@
               "default": 11000,
               "minimum": 1,
               "maximum": 65535,
-              "description": "11000 for a normal player. Multi-zone models such as the NAD CI-S2 and CI 580 use 11010, 11020 and 11030 for their extra zones."
+              "description": "11000 for a normal player. Multi-zone models such as the NAD CI S2 and CI 580 use 11010, 11020 and 11030 for their extra zones."
             },
             "volumeSlider": {
               "title": "Volume Slider",
@@ -104,6 +120,12 @@
               "type": "boolean",
               "default": false,
               "description": "State of charge. Only for players with a battery pack fitted, such as a PULSE FLEX with the BP100."
+            },
+            "reboot": {
+              "title": "Reboot Switch",
+              "type": "boolean",
+              "default": false,
+              "description": "A switch that restarts this player. It springs back to off on its own and does nothing when switched off, so a scene or \"turn everything off\" cannot trigger it. Restarting interrupts playback. On a multi-zone chassis such as a CI S2 it restarts every zone on that box: BluOS reboots the box, not the zone, and there is no way to restart just this room."
             },
             "volumePresets": {
               "title": "Volume Presets",

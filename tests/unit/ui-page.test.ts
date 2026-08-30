@@ -88,6 +88,7 @@ interface Toast {
 interface Page {
   byId: (id: string) => FakeNode
   saved: () => Record<string, unknown>[]
+  savedOptions: () => Record<string, unknown>
   toast: Toast
   find: (tag: string, label: string) => FakeNode
   players: () => FakeNode
@@ -116,6 +117,7 @@ async function load(config: unknown[], request?: jest.Mock): Promise<Page> {
   for (const id of [
     'players', 'summary', 'save', 'timeout', 'manual-host', 'manual-port',
     'manual', 'discover', 'manual-probe', 'toggle-manual', 'toggle-json',
+    'reboot-all', 'reboot-all-name', 'reboot-all-name-row',
   ]) {
     elements.set(id, new FakeNode('div'))
   }
@@ -164,6 +166,10 @@ async function load(config: unknown[], request?: jest.Mock): Promise<Page> {
       const last = updates.at(-1)?.[0]
       return (last?.devices ?? []) as Record<string, unknown>[]
     },
+    savedOptions: () => {
+      const last = updates.at(-1)?.[0]
+      return (last?.options ?? {}) as Record<string, unknown>
+    },
     find: (tag, label) => {
       const match = byId('players').descendants()
         .find((node) => node.tagName === tag && node.textContent === label)
@@ -196,6 +202,23 @@ const configured = {
   options: { sliderService: 'fan' },
 }
 
+/**
+ * Tick a labelled checkbox, the way a click would.
+ *
+ * Found through the label's `for`, because the checkbox itself carries no text
+ * and the page generates its id.
+ */
+function tick(page: Page, label: string): void {
+  const id = page.find('label', label).attributes.get('for')
+  const input = page.players().descendants()
+    .find((node) => node.tagName === 'input' && node.attributes.get('id') === id)
+  if (input === undefined) {
+    throw new Error(`no checkbox labelled ${label}`)
+  }
+  input.checked = !input.checked
+  input.fire('change')
+}
+
 /** Saves and returns the one device that was written. */
 async function saveOne(page: Page): Promise<Record<string, unknown>> {
   page.byId('save').fire('click')
@@ -213,11 +236,118 @@ describe('the settings page', () => {
     expect(page.byId('summary').textContent).toBe('1 player(s), 3 HomeKit accessory(s).')
   })
 
+  it('leaves the reboot switch off until it is ticked, and counts it once it is', async () => {
+    // Off by default because restarting a player interrupts whatever it is
+    // doing, which is not something to inherit from pressing Discover.
+    const page = await load([configured])
+
+    expect((await saveOne(page)).reboot).toBe(false)
+
+    tick(page, 'Reboot switch (restarts this player, and any zone sharing its box)')
+
+    expect((await saveOne(page)).reboot).toBe(true)
+  })
+
+  it('counts a reboot switch in the accessory total', async () => {
+    const page = await load([{
+      ...configured,
+      devices: [{ ...configured.devices[0], reboot: true }],
+    }])
+
+    expect(page.byId('summary').textContent).toBe('1 player(s), 4 HomeKit accessory(s).')
+  })
+
   it('says so plainly when there is nothing configured yet', async () => {
     const page = await load([])
 
     expect(page.players().textContent).toContain('No players yet')
     expect(page.byId('summary').textContent).toBe('Nothing selected.')
+  })
+
+  describe('the reboot all switch', () => {
+    it('is off, with its name field hidden, until it is switched on', async () => {
+      const page = await load([configured])
+
+      expect(page.byId('reboot-all').checked).toBe(false)
+      expect(page.byId('reboot-all-name-row').hidden).toBe(true)
+
+      page.byId('reboot-all').checked = true
+      page.byId('reboot-all').fire('change')
+
+      expect(page.byId('reboot-all-name-row').hidden).toBe(false)
+    })
+
+    it('saves the name the user typed', async () => {
+      const page = await load([configured])
+      page.byId('reboot-all').checked = true
+      page.byId('reboot-all').fire('change')
+      page.byId('reboot-all-name').value = 'Restart Everything'
+
+      page.byId('save').fire('click')
+      await settle()
+
+      expect(page.savedOptions()).toMatchObject({
+        rebootAll: true,
+        rebootAllName: 'Restart Everything',
+      })
+    })
+
+    it('trims the name, and drops it when left blank', async () => {
+      // A blank name must not be saved: the plugin's default is better than an
+      // accessory called nothing at all.
+      const page = await load([configured])
+      page.byId('reboot-all').checked = true
+      page.byId('reboot-all').fire('change')
+      page.byId('reboot-all-name').value = '   '
+
+      page.byId('save').fire('click')
+      await settle()
+
+      expect(page.savedOptions()).toEqual({ sliderService: 'fan', rebootAll: true })
+    })
+
+    it('shows the saved name when the page is reopened', async () => {
+      const page = await load([{
+        ...configured,
+        options: { rebootAll: true, rebootAllName: 'Downstairs Reboot' },
+      }])
+
+      expect(page.byId('reboot-all').checked).toBe(true)
+      expect(page.byId('reboot-all-name').value).toBe('Downstairs Reboot')
+      expect(page.byId('reboot-all-name-row').hidden).toBe(false)
+    })
+
+    it('forgets the name when the switch is turned off', async () => {
+      const page = await load([{
+        ...configured,
+        options: { rebootAll: true, rebootAllName: 'Downstairs Reboot' },
+      }])
+      page.byId('reboot-all').checked = false
+      page.byId('reboot-all').fire('change')
+
+      page.byId('save').fire('click')
+      await settle()
+
+      expect(page.savedOptions()).toEqual({})
+    })
+
+    it('does not touch the saved configuration until Save is pressed', async () => {
+      // getPluginConfig hands back live objects, so editing a control in place
+      // would change the configuration of a user who then closed the page.
+      const block = { ...configured, options: { sliderService: 'fan' } }
+      const page = await load([block])
+
+      page.byId('reboot-all').checked = true
+      page.byId('reboot-all').fire('change')
+
+      expect(block.options).toEqual({ sliderService: 'fan' })
+    })
+
+    it('counts towards the accessory total even with no players', async () => {
+      const page = await load([{ ...configured, devices: [], options: { rebootAll: true } }])
+
+      expect(page.byId('summary').textContent).toBe('0 player(s), 1 HomeKit accessory(s).')
+    })
   })
 
   it('keeps a setting it does not model, rather than dropping it on save', async () => {

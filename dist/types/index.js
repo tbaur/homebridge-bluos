@@ -16,9 +16,19 @@ exports.isSliderService = isSliderService;
  * What an accessory does. Part of its identity, and therefore of its UUID.
  *
  * `volume` is the fake slider, `mute` the mute switch, `volumePreset` a
- * one-level switch, and `battery` the state-of-charge sensor for portables.
+ * one-level switch, `battery` the state-of-charge sensor for portables, and
+ * `reboot` a momentary switch that restarts one player. `rebootAll` is the only
+ * kind with no player behind it: it belongs to the platform and restarts every
+ * player it can find.
  */
-exports.ACCESSORY_KINDS = ['volume', 'mute', 'volumePreset', 'battery'];
+exports.ACCESSORY_KINDS = [
+    'volume',
+    'mute',
+    'volumePreset',
+    'battery',
+    'reboot',
+    'rebootAll',
+];
 /** Narrow an unknown value to an {@link AccessoryKind}. */
 function isAccessoryKind(value) {
     return typeof value === 'string' && exports.ACCESSORY_KINDS.includes(value);

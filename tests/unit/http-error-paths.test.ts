@@ -23,8 +23,11 @@ import { ConnectionError } from '../../src/utils/errors'
 interface FakeRequest extends EventEmitter {
   readonly timeouts: { ms: number, handler?: () => void }[]
   destroyed: boolean
+  /** The body passed to `end`, so a POST's payload can be asserted on. */
+  sentBody: string | undefined
   setTimeout: (ms: number, handler?: () => void) => FakeRequest
   destroy: () => FakeRequest
+  end: (body?: string) => FakeRequest
 }
 
 interface FakeResponse extends EventEmitter {
@@ -40,6 +43,8 @@ jest.mock('node:http', () => {
 
     destroyed = false
 
+    sentBody: string | undefined
+
     setTimeout(ms: number, handler?: () => void): this {
       this.timeouts.push({ ms, handler })
       return this
@@ -49,10 +54,19 @@ jest.mock('node:http', () => {
       this.destroyed = true
       return this
     }
+
+    // Real `end` flushes the body and emits `finish`, which is what the module
+    // under test uses to decide whether a request reached the player.
+    end(body?: string): this {
+      this.sentBody = body
+      this.emit('finish')
+      return this
+    }
   }
 
   const state: {
     request?: Request
+    options?: { method?: string, headers?: Record<string, string> }
     onResponse?: (response: EventEmitter) => void
   } = {}
 
@@ -60,13 +74,14 @@ jest.mock('node:http', () => {
     __esModule: true,
     __state: state,
     default: {
-      get: (
+      request: (
         _url: string,
-        _options: unknown,
+        options: { method?: string, headers?: Record<string, string> },
         onResponse: (response: EventEmitter) => void,
       ): Request => {
         const request = new Request()
         state.request = request
+        state.options = options
         state.onResponse = onResponse
         return request
       },
@@ -75,7 +90,11 @@ jest.mock('node:http', () => {
 })
 
 const mocked = jest.requireMock('node:http') as {
-  __state: { request?: FakeRequest, onResponse?: (response: FakeResponse) => void }
+  __state: {
+    request?: FakeRequest
+    options?: { method?: string, headers?: Record<string, string> }
+    onResponse?: (response: FakeResponse) => void
+  }
 }
 
 const limits = { connectTimeoutMs: 40, totalTimeoutMs: 500, maxBytes: 4_096 }

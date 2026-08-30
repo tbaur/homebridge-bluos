@@ -1,6 +1,6 @@
 # Releasing
 
-Releases are automated with [release-please](https://github.com/googleapis/release-please). Versions, `CHANGELOG.md`, git tags, GitHub Releases, and `npm publish` are all derived from commit messages — none are edited or run by hand.
+Releases are automated with [release-please](https://github.com/googleapis/release-please). Versions, `CHANGELOG.md`, git tags, GitHub Releases, and `npm publish` are all derived from commit messages. None of them are edited or run by hand.
 
 ## Flow
 
@@ -33,13 +33,13 @@ An accessory-affecting release deserves a note in the changelog body, not just a
 
 That happened at 0.1.1: commit [`159c7d9`](https://github.com/tbaur/homebridge-bluos/commit/159c7d9a5385e33607714fb8df79c5eb6363ae04) reverted the `@homebridge/plugin-ui-utils` and `@types/node` bumps that had merged after its branch was created. Dependabot raised both again, they merged after 1.0.0 was tagged, and the published 1.0.0 tarball consequently still depends on `@homebridge/plugin-ui-utils` 2.2.4.
 
-If the diff is wrong, do not fix it in place — close the Release PR and delete its branch (`release-please--branches--main--components--homebridge-bluos`). The next push to `main`, or a manual run of the release workflow, opens a fresh one from current `main`.
+If the diff is wrong, do not fix it in place. Close the Release PR and delete its branch (`release-please--branches--main--components--homebridge-bluos`). The next push to `main`, or a manual run of the release workflow, opens a fresh one from current `main`.
 
 ## Branch protection
 
 `main` is protected with settings chosen to be compatible with the automated flow above:
 
-- **Require a pull request before merging** (0 required approvals) — keeps direct pushes off `main` without blocking a solo maintainer.
+- **Require a pull request before merging** (0 required approvals). This keeps direct pushes off `main` without blocking a solo maintainer.
 - **Block force-pushes and deletions.**
 - **No required status checks.** The Tests workflow runs on every code PR and is visible there, but it is intentionally *not* a hard merge gate. The Release PR is opened by the built-in `GITHUB_TOKEN`, and GitHub does not trigger workflows for such PRs (loop prevention), so a required check would leave every Release PR permanently unmergeable. The `publish` job re-runs build → lint → test before `npm publish`, so releases are still gated on a green build.
 
@@ -47,7 +47,7 @@ If the diff is wrong, do not fix it in place — close the Release PR and delete
 
 ## Publishing authentication
 
-Publishing uses **npm Trusted Publishing (OIDC)** — there is no `NPM_TOKEN` secret. The package is linked to this repo's `release.yml` workflow on npmjs.com:
+Publishing uses **npm Trusted Publishing (OIDC)**, so there is no `NPM_TOKEN` secret. The package is linked to this repo's `release.yml` workflow on npmjs.com:
 
 - Package → **Settings → Trusted Publisher** (Publishing access)
 - GitHub Actions publisher: organization/user `tbaur`, repository `homebridge-bluos`, workflow `release.yml`, no environment.

@@ -12,7 +12,7 @@
  * can tell a vendor requirement apart from a judgement call.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_NAME_LENGTH = exports.MAX_LOG_FIELD_LENGTH = exports.DISCOVERY_VERIFY_CONCURRENCY = exports.MAX_DISCOVERY_CANDIDATES = exports.MAX_DISCOVERY_RECORDS = exports.REDISCOVERY_MIN_INTERVAL_MS = exports.FAILURES_BEFORE_REDISCOVERY = exports.MAX_DISCOVERY_TIMEOUT_SEC = exports.MIN_DISCOVERY_TIMEOUT_SEC = exports.DEFAULT_DISCOVERY_TIMEOUT_SEC = exports.MDNS_SERVICE_SECONDARY = exports.MDNS_SERVICE_PRIMARY = exports.MAX_XML_ATTRIBUTES = exports.MAX_XML_ELEMENTS = exports.MAX_XML_DEPTH = exports.MAX_XML_BYTES = exports.MUTED_DB_SENTINEL = exports.FIXED_VOLUME_SENTINEL = exports.VOLUME_MAX = exports.VOLUME_MIN = exports.SLIDER_COALESCE_MS = exports.DEFAULT_RESTORE_VOLUME = exports.HOMEKIT_WRITE_BUDGET_MS = exports.POLL_FAILURE_REWARN_MS = exports.POLL_FAILURES_BEFORE_UNKNOWN = exports.POLL_BACKOFF_MAX_MS = exports.POLL_BACKOFF_BASE_MS = exports.CONTROL_RATE_LIMIT_MS = exports.STATUS_TIMEOUT_MS = exports.CONTROL_TIMEOUT_MS = exports.CONNECT_TIMEOUT_MS = exports.SAME_RESOURCE_MIN_GAP_MS = exports.LONG_POLL_READ_SLACK_MS = exports.LONG_POLL_SEC = exports.MAX_PORT = exports.MIN_PORT = exports.DOCUMENTED_BLUOS_PORTS = exports.DEFAULT_BLUOS_PORT = exports.DEFAULT_MODEL = exports.DEFAULT_BRAND = exports.UNKNOWN_PLUGIN_VERSION = exports.UUID_PREFIX = exports.PLATFORM_NAME = exports.PLUGIN_NAME = void 0;
+exports.MAX_NAME_LENGTH = exports.MAX_LOG_FIELD_LENGTH = exports.DISCOVERY_VERIFY_CONCURRENCY = exports.MAX_DISCOVERY_CANDIDATES = exports.MAX_DISCOVERY_RECORDS = exports.REDISCOVERY_MIN_INTERVAL_MS = exports.FAILURES_BEFORE_REDISCOVERY = exports.MAX_DISCOVERY_TIMEOUT_SEC = exports.MIN_DISCOVERY_TIMEOUT_SEC = exports.DEFAULT_DISCOVERY_TIMEOUT_SEC = exports.MDNS_SERVICE_SECONDARY = exports.MDNS_SERVICE_PRIMARY = exports.MAX_XML_ATTRIBUTES = exports.MAX_XML_ELEMENTS = exports.MAX_XML_DEPTH = exports.MAX_XML_BYTES = exports.MUTED_DB_SENTINEL = exports.FIXED_VOLUME_SENTINEL = exports.VOLUME_MAX = exports.VOLUME_MIN = exports.MOMENTARY_RESET_MS = exports.SLIDER_COALESCE_MS = exports.DEFAULT_RESTORE_VOLUME = exports.HOMEKIT_WRITE_BUDGET_MS = exports.POLL_FAILURE_REWARN_MS = exports.POLL_FAILURES_BEFORE_UNKNOWN = exports.POLL_BACKOFF_MAX_MS = exports.POLL_BACKOFF_BASE_MS = exports.CONTROL_RATE_LIMIT_MS = exports.REBOOT_FORM = exports.REBOOT_RESOURCE = exports.REBOOT_TIMEOUT_MS = exports.STATUS_TIMEOUT_MS = exports.CONTROL_TIMEOUT_MS = exports.CONNECT_TIMEOUT_MS = exports.SAME_RESOURCE_MIN_GAP_MS = exports.LONG_POLL_READ_SLACK_MS = exports.LONG_POLL_SEC = exports.MAX_PORT = exports.MIN_PORT = exports.DOCUMENTED_BLUOS_PORTS = exports.DEFAULT_BLUOS_PORT = exports.DEFAULT_MODEL = exports.DEFAULT_BRAND = exports.UNKNOWN_PLUGIN_VERSION = exports.PLATFORM_DEVICE_ID = exports.UUID_PREFIX = exports.PLATFORM_NAME = exports.PLUGIN_NAME = void 0;
 exports.readPluginVersion = readPluginVersion;
 /** npm package name. Must match `package.json` `name` for Homebridge to load us. */
 exports.PLUGIN_NAME = 'homebridge-bluos';
@@ -26,6 +26,15 @@ exports.PLATFORM_NAME = 'BluOS';
  * the rooms, scenes and automations the user built on top of them.
  */
 exports.UUID_PREFIX = 'homebridge-bluos:';
+/**
+ * Stands in for a player id on the accessories that belong to the platform.
+ *
+ * Only the "reboot everything" switch uses it. Accessory identity is built from
+ * a device id, and that switch has no device, so it needs a value that is stable
+ * for the life of the install and can never collide with a real player. A real
+ * id is a MAC and port or a `gen-` UUID; neither can look like this.
+ */
+exports.PLATFORM_DEVICE_ID = 'platform:all';
 /** Reported when `package.json` cannot be read. */
 exports.UNKNOWN_PLUGIN_VERSION = '0.0.0';
 /** Manufacturer shown when `/SyncStatus` does not report a brand. */
@@ -39,7 +48,7 @@ exports.DEFAULT_BLUOS_PORT = 11_000;
  * Ports the specification documents for multi-zone chassis.
  *
  * API v1.7 section 1: the CI 580 exposes four streamer nodes on one IP, using
- * 11000, 11010, 11020 and 11030. The CI-S2 uses 11000 and 11010. Ports outside
+ * 11000, 11010, 11020 and 11030. The CI S2 uses 11000 and 11010. Ports outside
  * this set are accepted but warned about, because mDNS SRV records are the
  * authority on which port a zone actually listens to.
  */
@@ -74,6 +83,27 @@ exports.CONNECT_TIMEOUT_MS = 2_500;
 exports.CONTROL_TIMEOUT_MS = 5_000;
 /** Total timeout for a plain, non-long-poll status read. */
 exports.STATUS_TIMEOUT_MS = 6_000;
+/**
+ * Total timeout for a reboot request.
+ *
+ * Short on purpose. A player that is restarting cannot finish answering, so
+ * waiting longer only delays the point at which we accept a half-finished
+ * exchange as success. The sibling `bluos-controller` project uses 2 s against
+ * the same fleet; this leaves a little more room for a busy player.
+ */
+exports.REBOOT_TIMEOUT_MS = 3_000;
+/**
+ * The reboot resource, and the parameters that arm it.
+ *
+ * The one command in the API that is POST rather than GET, and the only one
+ * addressed without a BluOS port: `/reboot` is served on port 80 and answers 404
+ * on the control ports. The body mirrors the confirmation form that page serves,
+ * whose submit button is named `yes`. See the reboot section of
+ * docs/PROTOCOL.md.
+ */
+exports.REBOOT_RESOURCE = 'reboot';
+/** @see REBOOT_RESOURCE */
+exports.REBOOT_FORM = { noheader: '0', yes: '1' };
 /** Minimum spacing between control calls to one endpoint. */
 exports.CONTROL_RATE_LIMIT_MS = 100;
 /** First reconnect delay after a failed poll. Doubles up to the ceiling. */
@@ -107,6 +137,15 @@ exports.DEFAULT_RESTORE_VOLUME = 20;
  * to be imperceptible next to the LAN round trip.
  */
 exports.SLIDER_COALESCE_MS = 150;
+/**
+ * How long a momentary switch stays on before it springs back.
+ *
+ * A reboot switch has no state to report: the player is either restarting or it
+ * is not, and neither is "on". Long enough that the Home app renders the press
+ * so the user sees the tap registered, short enough that the tile is not left
+ * looking like a thing that is still happening.
+ */
+exports.MOMENTARY_RESET_MS = 1_000;
 // --- Volume ----------------------------------------------------------------
 /** Lowest BluOS volume level. */
 exports.VOLUME_MIN = 0;

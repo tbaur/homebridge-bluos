@@ -15,9 +15,9 @@
 
 import type { HAP, PlatformAccessory, Service } from 'homebridge'
 
-import type { BluOSClient, Endpoint, WriteScope } from '../../src/api/client'
+import type { BluOSClient, Endpoint, RebootResult, WriteScope } from '../../src/api/client'
 import type { VolumeResult } from '../../src/api/sync-status'
-import type { AccessoryHost } from '../../src/devices/host'
+import type { AccessoryHost, RebootTarget } from '../../src/devices/host'
 import type { AccessoryContext, PlayerObservation, PluginLogger } from '../../src/types'
 
 /** A recorded characteristic. */
@@ -240,7 +240,10 @@ export interface Harness {
   client: {
     setVolume: jest.Mock<Promise<VolumeResult>, [Endpoint, number, WriteScope?]>
     setMute: jest.Mock<Promise<VolumeResult>, [Endpoint, boolean, WriteScope?]>
+    reboot: jest.Mock<Promise<RebootResult>, [string]>
   }
+  /** Targets the global reboot switch is told about. */
+  rebootTargets: jest.Mock<Promise<readonly RebootTarget[]>, []>
   adopted: VolumeResult[]
   persisted: number
   /** Accessories whose context was written back, in order. */
@@ -270,6 +273,10 @@ export function harness(overrides: {
   endpoint?: Endpoint | undefined
   volumeResult?: VolumeResult
   muteResult?: VolumeResult
+  rebootResult?: RebootResult
+  rebootTargets?: readonly RebootTarget[]
+  /** Other configured players behind this one's address. */
+  sharingAddress?: readonly string[]
 } = {}): Harness {
   const context: AccessoryContext = { ...defaultContext, ...overrides.context }
   const accessory = new FakeAccessory(
@@ -289,7 +296,12 @@ export function harness(overrides: {
     setMute: jest.fn(async (_endpoint: Endpoint, muted: boolean, _scope?: WriteScope) => (
       overrides.muteResult ?? { level: muted ? 0 : 40, fixedVolume: false, muted }
     )),
+    reboot: jest.fn(async (_host: string) => (
+      overrides.rebootResult ?? { acknowledged: true }
+    )),
   }
+
+  const rebootTargets = jest.fn(async () => overrides.rebootTargets ?? [])
 
   const endpoint = 'endpoint' in overrides
     ? overrides.endpoint
@@ -309,6 +321,8 @@ export function harness(overrides: {
       persisted += 1
       persistedAccessories.push(target)
     },
+    rebootTargets,
+    playersSharingAddress: () => overrides.sharingAddress ?? [],
   }
 
   return {
@@ -317,6 +331,7 @@ export function harness(overrides: {
     context,
     log,
     client,
+    rebootTargets,
     adopted,
     get persisted() {
       return persisted

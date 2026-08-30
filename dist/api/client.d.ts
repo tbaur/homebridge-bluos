@@ -14,7 +14,7 @@
  *    clients, and phrases it as a requirement rather than advice.
  * 2. At least 100 ms between control calls to one endpoint, so a HomeKit scene
  *    that touches several tiles at once cannot burst a player.
- * 3. Writes to one chassis are serialised. A NAD CI-S2 or CI 580 exposes several
+ * 3. Writes to one chassis are serialised. A NAD CI S2 or CI 580 exposes several
  *    zones on one IP; concurrent writes to `:11000` and `:11010` are writes to
  *    the same box. Different chassis still run in parallel.
  *
@@ -24,7 +24,7 @@
  * is expressed per write through {@link WriteScope}.
  */
 import type { PlayerObservation, PluginLogger } from '../types';
-import { type HttpGet } from './http';
+import { type HttpGet, type HttpPost } from './http';
 import { type VolumeResult } from './sync-status';
 /** Where to reach one player zone. */
 export interface Endpoint {
@@ -44,10 +44,23 @@ export interface Endpoint {
 export interface WriteScope {
     tellSlaves: boolean;
 }
+/**
+ * What a reboot request produced.
+ *
+ * `acknowledged` is false when the player took the request and then stopped
+ * answering, which is a success rather than a failure — see
+ * {@link BluOSClient.reboot}. It is carried so the log can say which happened,
+ * because "sent, no answer" and "sent, answered" look identical to the user and
+ * only one of them is worth investigating if the player never comes back.
+ */
+export interface RebootResult {
+    acknowledged: boolean;
+}
 /** Injectable collaborators, so tests need neither sockets nor real clocks. */
 export interface BluOSClientOptions {
     log: PluginLogger;
     httpGet?: HttpGet;
+    httpPost?: HttpPost;
     now?: () => number;
     sleep?: (ms: number) => Promise<void>;
 }
@@ -60,6 +73,7 @@ export interface BluOSClientOptions {
 export declare class BluOSClient {
     private readonly log;
     private readonly httpGet;
+    private readonly httpPost;
     private readonly now;
     private readonly sleep;
     /** Last request time, keyed by `endpoint|resource`, for the one-second rule. */
@@ -112,6 +126,30 @@ export declare class BluOSClient {
      * `mute=1` produced `mute="1" muteVolume="72"` on a real player.
      */
     setMute(endpoint: Endpoint, muted: boolean, scope?: WriteScope): Promise<VolumeResult>;
+    /**
+     * Restart the box at an address.
+     *
+     * Takes a host and no port, which is the whole story about this call. `/reboot`
+     * is served on port 80 alongside `/diagnostics`, and the control ports answer
+     * 404 for it. Port 80 is one server per chassis, so this restarts every zone
+     * behind the address and cannot be aimed at one zone of a CI S2, however much
+     * the rest of the API is per zone. See docs/PROTOCOL.md.
+     *
+     * Deliberately outside {@link withChassisLock}, unlike every other write. That
+     * lock protects one address from concurrent volume and mute traffic, which is
+     * rapid and repeated; a reboot is one request per address per press. Holding
+     * the lock would only mean that a box which dies mid-response makes anything
+     * queued behind it wait out the whole timeout. `respectResourceGap` still
+     * paces repeat presses, keyed on the same address.
+     *
+     * A lost connection counts as success once the request reached the player.
+     * This is the one call where that is right rather than reckless: a player that
+     * is restarting cannot finish answering, so insisting on a clean response would
+     * report failure precisely when the command worked. A failure to connect at all
+     * is still a failure, which is the distinction {@link ConnectionError.delivered}
+     * exists to draw.
+     */
+    reboot(host: string): Promise<RebootResult>;
     private control;
     /**
      * Queue work behind anything already writing to this chassis.
@@ -127,5 +165,15 @@ export declare class BluOSClient {
      * the same resource on the same endpoint.
      */
     private respectResourceGap;
+    /**
+     * Validate the host and wait out the same-resource gap, then name the target.
+     *
+     * Shared by every request whatever its method, so a new call path cannot
+     * forget either. The host check especially: two copies of the one defence
+     * against a configuration or cache value altering a request URL would
+     * eventually disagree, and the disagreement would be the security regression.
+     * It is the same check the settings page and the configuration validator apply.
+     */
+    private prepare;
     private get;
 }
