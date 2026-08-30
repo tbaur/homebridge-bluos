@@ -705,6 +705,20 @@ describe('BluOSPlatform', () => {
       expect(test.log.calls.some((line) => line.includes('is responding again'))).toBe(false)
     })
 
+    it('does not end the window on a reading that arrives before the box goes down', () => {
+      const test = build({ devices: [device] })
+      test.launch()
+      test.platform.expectReboot(device.host)
+      // refreshNow's first read often still lands: the control ports have not
+      // dropped yet. That is not recovery.
+      test.platform['publish'](device.id, observation({ volume: 60 }), 'poll')
+
+      test.platform['reportUnavailable'](device.id, timeout())
+
+      expect(test.log.calls.some((line) => line.includes('is not responding'))).toBe(false)
+      expect(test.log.calls.some((line) => line.includes('is responding again'))).toBe(false)
+    })
+
     it('warns about a failure that follows the player coming back', () => {
       const test = build({ devices: [device] })
       test.launch()

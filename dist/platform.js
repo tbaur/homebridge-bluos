@@ -529,9 +529,10 @@ class BluOSPlatform {
         }
     }
     publish(deviceId, observation, reason) {
-        // The player answered, so the reboot is over even if the window has time
-        // left. Anything that fails after this is a real outage and is said so.
-        this.rebootGrace.clear(this.hostOf(deviceId));
+        // Ends the window only after the box has already gone quiet. A last-gasp
+        // reading while the ports are still up must not cancel it, or the real
+        // outage that follows is logged as a surprise.
+        this.rebootGrace.clearIfRecovered(this.hostOf(deviceId));
         for (const handler of this.handlers.get(deviceId) ?? []) {
             try {
                 handler.applyObservation(observation, reason);
@@ -542,7 +543,9 @@ class BluOSPlatform {
         }
     }
     reportUnavailable(deviceId, error) {
-        if (this.rebootGrace.isExpected(this.hostOf(deviceId))) {
+        const host = this.hostOf(deviceId);
+        if (this.rebootGrace.isExpected(host)) {
+            this.rebootGrace.noteSilence(host);
             return;
         }
         for (const handler of this.handlers.get(deviceId) ?? []) {
