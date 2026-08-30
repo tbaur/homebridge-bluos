@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/tbaur/homebridge-bluos/compare/v1.0.3...v1.1.0) (2026-08-30)
+
+
+### Features
+
+* add per-player and whole-install reboot switches ([#21](https://github.com/tbaur/homebridge-bluos/issues/21)) ([55270a4](https://github.com/tbaur/homebridge-bluos/commit/55270a428ca8dc02d9af04814c8496dc6d8bdda2))
+
 ## [1.0.3](https://github.com/tbaur/homebridge-bluos/compare/v1.0.2...v1.0.3) (2026-08-18)
 
 
