@@ -28,6 +28,16 @@ export const PLATFORM_NAME = 'BluOS'
  */
 export const UUID_PREFIX = 'homebridge-bluos:'
 
+/**
+ * Stands in for a player id on the accessories that belong to the platform.
+ *
+ * Only the "reboot everything" switch uses it. Accessory identity is built from
+ * a device id, and that switch has no device, so it needs a value that is stable
+ * for the life of the install and can never collide with a real player. A real
+ * id is a MAC and port or a `gen-` UUID; neither can look like this.
+ */
+export const PLATFORM_DEVICE_ID = 'platform:all'
+
 /** Reported when `package.json` cannot be read. */
 export const UNKNOWN_PLUGIN_VERSION = '0.0.0'
 
@@ -46,7 +56,7 @@ export const DEFAULT_BLUOS_PORT = 11_000
  * Ports the specification documents for multi-zone chassis.
  *
  * API v1.7 section 1: the CI 580 exposes four streamer nodes on one IP, using
- * 11000, 11010, 11020 and 11030. The CI-S2 uses 11000 and 11010. Ports outside
+ * 11000, 11010, 11020 and 11030. The CI S2 uses 11000 and 11010. Ports outside
  * this set are accepted but warned about, because mDNS SRV records are the
  * authority on which port a zone actually listens to.
  */
@@ -91,6 +101,30 @@ export const CONTROL_TIMEOUT_MS = 5_000
 /** Total timeout for a plain, non-long-poll status read. */
 export const STATUS_TIMEOUT_MS = 6_000
 
+/**
+ * Total timeout for a reboot request.
+ *
+ * Short on purpose. A player that is restarting cannot finish answering, so
+ * waiting longer only delays the point at which we accept a half-finished
+ * exchange as success. The sibling `bluos-controller` project uses 2 s against
+ * the same fleet; this leaves a little more room for a busy player.
+ */
+export const REBOOT_TIMEOUT_MS = 3_000
+
+/**
+ * The reboot resource, and the parameters that arm it.
+ *
+ * The one command in the API that is POST rather than GET, and the only one
+ * addressed without a BluOS port: `/reboot` is served on port 80 and answers 404
+ * on the control ports. The body mirrors the confirmation form that page serves,
+ * whose submit button is named `yes`. See the reboot section of
+ * docs/PROTOCOL.md.
+ */
+export const REBOOT_RESOURCE = 'reboot'
+
+/** @see REBOOT_RESOURCE */
+export const REBOOT_FORM: Readonly<Record<string, string>> = { noheader: '0', yes: '1' }
+
 /** Minimum spacing between control calls to one endpoint. */
 export const CONTROL_RATE_LIMIT_MS = 100
 
@@ -132,6 +166,16 @@ export const DEFAULT_RESTORE_VOLUME = 20
  * to be imperceptible next to the LAN round trip.
  */
 export const SLIDER_COALESCE_MS = 150
+
+/**
+ * How long a momentary switch stays on before it springs back.
+ *
+ * A reboot switch has no state to report: the player is either restarting or it
+ * is not, and neither is "on". Long enough that the Home app renders the press
+ * so the user sees the tap registered, short enough that the tile is not left
+ * looking like a thing that is still happening.
+ */
+export const MOMENTARY_RESET_MS = 1_000
 
 // --- Volume ----------------------------------------------------------------
 

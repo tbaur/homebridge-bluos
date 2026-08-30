@@ -18,6 +18,18 @@
  * fails to appear is the hardest kind of bug for a user to report.
  */
 import { type ResolvedAccessory, type ResolvedDevice, type SliderService } from '../types';
+/** Platform-wide settings after validation and defaulting. */
+export interface ResolvedPlatformOptions {
+    /** Expose the one switch that restarts every player on the network. */
+    rebootAll: boolean;
+    /**
+     * What to call that switch, when the user named it.
+     *
+     * `undefined` means "derive it", which is resolved where the accessory is
+     * built rather than here, because that is where the platform name is known.
+     */
+    rebootAllName: string | undefined;
+}
 /** Outcome of validating a platform configuration block. */
 export interface ConfigValidationResult {
     /** Fatal problems. Any entry means the platform must not start polling. */
@@ -26,6 +38,8 @@ export interface ConfigValidationResult {
     warnings: string[];
     /** Devices that survived validation, in configuration order. */
     devices: ResolvedDevice[];
+    /** Settings that belong to the platform rather than to any one player. */
+    options: ResolvedPlatformOptions;
 }
 /**
  * Make an untrusted string safe to interpolate into a log line.
@@ -96,4 +110,8 @@ export declare function validateConfig(config: unknown): ConfigValidationResult;
  * detected once: two accessories sharing a name still work, but they make Siri
  * ambiguous, which is worth a warning.
  */
-export declare function resolveAccessories(devices: readonly ResolvedDevice[], warnings?: string[]): ResolvedAccessory[];
+export declare function resolveAccessories(devices: readonly ResolvedDevice[], warnings?: string[], platform?: {
+    rebootAll: boolean;
+    rebootAllName?: string | undefined;
+    name: string;
+}): ResolvedAccessory[];

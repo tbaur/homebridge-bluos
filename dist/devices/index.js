@@ -26,5 +26,7 @@ __exportStar(require("./base-accessory"), exports);
 __exportStar(require("./battery-accessory"), exports);
 __exportStar(require("./host"), exports);
 __exportStar(require("./mute-accessory"), exports);
+__exportStar(require("./reboot-accessory"), exports);
+__exportStar(require("./reboot-all-accessory"), exports);
 __exportStar(require("./volume-accessory"), exports);
 __exportStar(require("./volume-preset-accessory"), exports);

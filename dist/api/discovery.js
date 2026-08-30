@@ -9,7 +9,7 @@
  *
  * Two service types are browsed, because a multi-zone chassis advertises each
  * zone separately: `_musc._tcp` for primary zones and `_musp._tcp` for the
- * secondaries of a CI-S2 or CI 580. API v1.7 section 1 is explicit that the port
+ * secondaries of a CI S2 or CI 580. API v1.7 section 1 is explicit that the port
  * "should be discovered by use of the MDNS protocol using the services musc.tcp
  * and musp.tcp", and only the SRV record knows whether a zone is on 11000,
  * 11010, 11020 or 11030.

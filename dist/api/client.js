@@ -15,7 +15,7 @@
  *    clients, and phrases it as a requirement rather than advice.
  * 2. At least 100 ms between control calls to one endpoint, so a HomeKit scene
  *    that touches several tiles at once cannot burst a player.
- * 3. Writes to one chassis are serialised. A NAD CI-S2 or CI 580 exposes several
+ * 3. Writes to one chassis are serialised. A NAD CI S2 or CI 580 exposes several
  *    zones on one IP; concurrent writes to `:11000` and `:11010` are writes to
  *    the same box. Different chassis still run in parallel.
  *
@@ -42,6 +42,7 @@ const sync_status_1 = require("./sync-status");
 class BluOSClient {
     log;
     httpGet;
+    httpPost;
     now;
     sleep;
     /** Last request time, keyed by `endpoint|resource`, for the one-second rule. */
@@ -53,6 +54,7 @@ class BluOSClient {
     constructor(options) {
         this.log = options.log;
         this.httpGet = options.httpGet ?? http_1.httpGet;
+        this.httpPost = options.httpPost ?? http_1.httpPost;
         this.now = options.now ?? Date.now;
         this.sleep = options.sleep ?? timing_1.sleep;
     }
@@ -137,6 +139,55 @@ class BluOSClient {
             tell_slaves: scope.tellSlaves ? '1' : '0',
         });
     }
+    /**
+     * Restart the box at an address.
+     *
+     * Takes a host and no port, which is the whole story about this call. `/reboot`
+     * is served on port 80 alongside `/diagnostics`, and the control ports answer
+     * 404 for it. Port 80 is one server per chassis, so this restarts every zone
+     * behind the address and cannot be aimed at one zone of a CI S2, however much
+     * the rest of the API is per zone. See docs/PROTOCOL.md.
+     *
+     * Deliberately outside {@link withChassisLock}, unlike every other write. That
+     * lock protects one address from concurrent volume and mute traffic, which is
+     * rapid and repeated; a reboot is one request per address per press. Holding
+     * the lock would only mean that a box which dies mid-response makes anything
+     * queued behind it wait out the whole timeout. `respectResourceGap` still
+     * paces repeat presses, keyed on the same address.
+     *
+     * A lost connection counts as success once the request reached the player.
+     * This is the one call where that is right rather than reckless: a player that
+     * is restarting cannot finish answering, so insisting on a clean response would
+     * report failure precisely when the command worked. A failure to connect at all
+     * is still a failure, which is the distinction {@link ConnectionError.delivered}
+     * exists to draw.
+     */
+    async reboot(host) {
+        if (!(0, validators_1.isValidHost)(host)) {
+            throw new errors_1.ConnectionError(`refusing to contact an invalid host: ${JSON.stringify(host)}`);
+        }
+        await this.respectResourceGap(`${host}|${settings_1.REBOOT_RESOURCE}`);
+        const url = `http://${host}/${settings_1.REBOOT_RESOURCE}`;
+        this.log.debug(`POST ${url}`);
+        try {
+            const response = await this.httpPost(url, { ...settings_1.REBOOT_FORM }, {
+                connectTimeoutMs: settings_1.CONNECT_TIMEOUT_MS,
+                totalTimeoutMs: settings_1.REBOOT_TIMEOUT_MS,
+                maxBytes: settings_1.MAX_XML_BYTES,
+            });
+            if (response.status !== 200) {
+                throw new errors_1.ProtocolError(`reboot on ${host} answered HTTP ${response.status}`);
+            }
+            return { acknowledged: true };
+        }
+        catch (error) {
+            if (error instanceof errors_1.ConnectionError && error.delivered) {
+                this.log.debug(`${host} stopped answering after the reboot request, which is expected`);
+                return { acknowledged: false };
+            }
+            throw error;
+        }
+    }
     async control(endpoint, query) {
         // Serialised per chassis: zones of a multi-zone player share one box.
         return this.withChassisLock(endpoint.host, async () => {
@@ -192,17 +243,26 @@ class BluOSClient {
         }
         this.lastResourceRequest.set(key, this.now());
     }
-    async get(request) {
-        const { endpoint, resource, query, totalTimeoutMs, signal } = request;
+    /**
+     * Validate the host and wait out the same-resource gap, then name the target.
+     *
+     * Shared by every request whatever its method, so a new call path cannot
+     * forget either. The host check especially: two copies of the one defence
+     * against a configuration or cache value altering a request URL would
+     * eventually disagree, and the disagreement would be the security regression.
+     * It is the same check the settings page and the configuration validator apply.
+     */
+    async prepare(endpoint, resource) {
         const target = (0, identity_1.formatEndpoint)(endpoint.host, endpoint.port);
-        // The same check the settings page and the configuration validator apply.
-        // Shared rather than restated: two copies of the one defence against a
-        // configuration or cache value altering a request URL would eventually
-        // disagree, and the disagreement would be the security regression.
         if (!(0, validators_1.isValidHost)(endpoint.host)) {
             throw new errors_1.ConnectionError(`refusing to contact an invalid host: ${JSON.stringify(endpoint.host)}`);
         }
         await this.respectResourceGap(`${target}|${resource}`);
+        return target;
+    }
+    async get(request) {
+        const { endpoint, resource, query, totalTimeoutMs, signal } = request;
+        const target = await this.prepare(endpoint, resource);
         const search = new URLSearchParams(query).toString();
         const url = `http://${target}/${resource}${search.length > 0 ? `?${search}` : ''}`;
         // Safe to log unsanitised, and the only place in the plugin where wire data

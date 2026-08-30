@@ -12,19 +12,19 @@ Do not open a public issue. Use GitHub's [private vulnerability reporting](https
 
 ## Security Measures
 
-- **LAN only** — Plain HTTP to the addresses in your configuration. The BluOS API has no authentication; this plugin stores no credentials.
-- **Input validation** — Config is checked at startup. A missing or non-list `devices` value disables the platform without unregistering accessories. A bad player or preset is skipped; hosts, ports and timeouts are rejected or clamped.
-- **Log safety** — Values written to logs have control characters stripped and are length-limited.
-- **Bounded I/O** — Connect and total timeouts on every request; responses capped at 128 KiB; XML parsed with size, depth and element caps.
-- **Discovery** — mDNS errors are caught so they cannot take Homebridge down. Browse results are capped.
-- **Settings probe** — Accepts only a private or local address and a documented BluOS port.
-- **Dependencies** — CI runs `npm audit` on the runtime tree and OSV-Scanner on the full tree.
+- **LAN only:** Plain HTTP to the addresses in your configuration. The BluOS API has no authentication, and this plugin stores no credentials.
+- **Input validation:** Config is checked at startup. A missing or non-list `devices` value disables the platform without unregistering accessories. A bad player or preset is skipped. Hosts, ports and timeouts are rejected or clamped.
+- **Log safety:** Values written to logs have control characters stripped and are length-limited.
+- **Bounded I/O:** Connect and total timeouts on every request, responses capped at 128 KiB, and XML parsed with size, depth and element caps.
+- **Discovery:** mDNS errors are caught so they cannot take Homebridge down. Browse results are capped.
+- **Settings probe:** Accepts only a private or local address and a documented BluOS port.
+- **Dependencies:** CI runs `npm audit` on the runtime tree and OSV-Scanner on the full tree.
 
 ## Best Practices for Users
 
 1. Keep Homebridge and this plugin updated.
 2. Run Homebridge with minimal privileges, and do not expose it or player port 11000 to the internet.
-3. The BluOS LAN API is unauthenticated — anyone who can reach a player can already control it.
+3. The BluOS LAN API is unauthenticated, so anyone who can reach a player can already control it.
 4. Set volume limits in the BluOS app. The plugin has none of its own, so a limit there covers every controller.
 5. A group leader's volume change applies to the whole group.
 

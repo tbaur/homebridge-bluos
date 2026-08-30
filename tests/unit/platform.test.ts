@@ -14,8 +14,8 @@
 import type { API, PlatformAccessory, PlatformConfig } from 'homebridge'
 
 import { BluOSPlatform } from '../../src/platform'
-import { PLATFORM_NAME, PLUGIN_NAME, UUID_PREFIX } from '../../src/settings'
-import type { AccessoryContext } from '../../src/types'
+import { PLATFORM_DEVICE_ID, PLATFORM_NAME, PLUGIN_NAME, UUID_PREFIX } from '../../src/settings'
+import type { AccessoryContext, DiscoveredPlayer } from '../../src/types'
 import { fakeHap, FakeAccessory, fakeLogger, FakeService } from '../helpers/hap'
 
 /**
@@ -28,8 +28,17 @@ import { fakeHap, FakeAccessory, fakeLogger, FakeService } from '../helpers/hap'
 class SilentDiscovery {
   cancelled = 0
 
-  async discover(): Promise<never[]> {
-    return []
+  /** What a sweep answers with. Only the global reboot switch sweeps. */
+  static found: DiscoveredPlayer[] = []
+
+  /** Set to make a sweep fail, for the degrade-to-configured path. */
+  static failure: Error | undefined
+
+  async discover(): Promise<DiscoveredPlayer[]> {
+    if (SilentDiscovery.failure !== undefined) {
+      throw SilentDiscovery.failure
+    }
+    return SilentDiscovery.found
   }
 
   cancelAll(): void {
@@ -140,6 +149,11 @@ function build(config: Partial<PlatformConfig> = {}): Fixture {
   }
 }
 
+/** A player as discovery would report it. */
+function player(id: string, name: string, host: string, port = 11_000): DiscoveredPlayer {
+  return { id, name, host, port, fixedVolume: false, hasBattery: false }
+}
+
 /** A cached accessory as Homebridge would restore it. */
 function cached(uuid: string, displayName: string, context: Partial<AccessoryContext>) {
   const accessory = new FakePlatformAccessory(displayName, uuid)
@@ -152,6 +166,8 @@ describe('BluOSPlatform', () => {
   // so nothing here ever reaches for the network.
   beforeEach(() => {
     jest.useFakeTimers()
+    SilentDiscovery.found = []
+    SilentDiscovery.failure = undefined
   })
 
   afterEach(() => {
@@ -549,6 +565,109 @@ describe('BluOSPlatform', () => {
       const test = build({ devices: [device] })
 
       expect(test.platform.pluginVersion).toMatch(/^\d+\.\d+\.\d+/)
+    })
+  })
+
+  describe('the global reboot switch', () => {
+    const withGlobal = { devices: [device], options: { rebootAll: true } }
+
+    it('registers with an identity that belongs to no player', () => {
+      const test = build(withGlobal)
+
+      test.launch()
+
+      expect(test.registered.map((accessory) => accessory.displayName))
+        .toEqual(['Zone One Volume', 'Zone One Mute', 'BluOS Reboot All'])
+      expect(test.registered[2]?.UUID).toBe(uuidOf(`${PLATFORM_DEVICE_ID}:rebootAll`))
+    })
+
+    it('registers even when no player is configured', () => {
+      // The case it is most needed in: a network that filters multicast leaves
+      // discovery empty, and a switch that never appeared could not help.
+      const test = build({ devices: [], options: { rebootAll: true } })
+
+      test.launch()
+
+      expect(test.registered.map((accessory) => accessory.displayName))
+        .toEqual(['BluOS Reboot All'])
+    })
+
+    it('takes its name from the platform alias', () => {
+      const test = build({ ...withGlobal, name: 'Upstairs BluOS' })
+
+      test.launch()
+
+      expect(test.registered.map((accessory) => accessory.displayName))
+        .toContain('Upstairs BluOS Reboot All')
+    })
+
+    it('unions configured players with whatever the sweep finds', async () => {
+      SilentDiscovery.found = [player('90:56:82:0A:00:03:11000', 'Kitchen', '192.168.4.12')]
+      const test = build(withGlobal)
+      test.launch()
+
+      const targets = await test.platform.rebootTargets()
+
+      expect(targets).toEqual([
+        { host: '192.168.4.11', names: ['Zone One'] },
+        { host: '192.168.4.12', names: ['Kitchen'] },
+      ])
+    })
+
+    it('sends one reboot when a player is both configured and discovered', async () => {
+      SilentDiscovery.found = [player(device.id, 'Zone One (BluOS app name)', device.host)]
+      const test = build(withGlobal)
+      test.launch()
+
+      const targets = await test.platform.rebootTargets()
+
+      // One target, under the name the user chose rather than the app's.
+      expect(targets).toEqual([{ host: '192.168.4.11', names: ['Zone One'] }])
+    })
+
+    it('collapses both zones of one chassis into a single target', async () => {
+      // Reboot is served on port 80, one server per box, so a second request
+      // would only land on a chassis already going down.
+      SilentDiscovery.found = [
+        player('90:56:82:0A:00:02:11010', 'Zone Two', '192.168.4.11', 11_010),
+      ]
+      const test = build(withGlobal)
+      test.launch()
+
+      const targets = await test.platform.rebootTargets()
+
+      expect(targets).toEqual([{ host: '192.168.4.11', names: ['Zone One', 'Zone Two'] }])
+    })
+
+    it('names the rooms that share a chassis with a given player', async () => {
+      const test = build({
+        devices: [device, { ...device, id: 'zone-two', name: 'Zone Two', port: 11_010 }],
+        options: { rebootAll: true },
+      })
+      test.launch()
+
+      expect(test.platform.playersSharingAddress(device.id)).toEqual(['Zone Two'])
+      expect(test.platform.playersSharingAddress('zone-two')).toEqual(['Zone One'])
+    })
+
+    it('names nobody for a player alone on its address', () => {
+      const test = build(withGlobal)
+      test.launch()
+
+      expect(test.platform.playersSharingAddress(device.id)).toEqual([])
+      expect(test.platform.playersSharingAddress('not-configured')).toEqual([])
+    })
+
+    it('falls back to the configured players when the sweep fails', async () => {
+      SilentDiscovery.failure = new Error('no multicast route')
+      const test = build(withGlobal)
+      test.launch()
+
+      const targets = await test.platform.rebootTargets()
+
+      expect(targets).toHaveLength(1)
+      expect(test.log.calls.some((line) => line.startsWith('warn')
+        && line.includes('could not sweep the network'))).toBe(true)
     })
   })
 

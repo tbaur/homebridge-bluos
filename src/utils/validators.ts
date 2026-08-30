@@ -29,6 +29,7 @@ import {
   MAX_PORT,
   MIN_DISCOVERY_TIMEOUT_SEC,
   MIN_PORT,
+  PLATFORM_DEVICE_ID,
   VOLUME_MAX,
   VOLUME_MIN,
 } from '../settings'
@@ -42,6 +43,20 @@ import {
   type VolumePresetConfig,
 } from '../types'
 
+/** Platform-wide settings after validation and defaulting. */
+export interface ResolvedPlatformOptions {
+  /** Expose the one switch that restarts every player on the network. */
+  rebootAll: boolean
+
+  /**
+   * What to call that switch, when the user named it.
+   *
+   * `undefined` means "derive it", which is resolved where the accessory is
+   * built rather than here, because that is where the platform name is known.
+   */
+  rebootAllName: string | undefined
+}
+
 /** Outcome of validating a platform configuration block. */
 export interface ConfigValidationResult {
   /** Fatal problems. Any entry means the platform must not start polling. */
@@ -50,6 +65,8 @@ export interface ConfigValidationResult {
   warnings: string[]
   /** Devices that survived validation, in configuration order. */
   devices: ResolvedDevice[]
+  /** Settings that belong to the platform rather than to any one player. */
+  options: ResolvedPlatformOptions
 }
 
 
@@ -382,12 +399,13 @@ function validateDevice(input: {
     port,
     // Absent means on, matching the schema default, the settings page and the
     // documented default. The other three accessories are opt-in, so they read
-    // the other way round; a hand-written entry of just id, name and host is
-    // meant to give you a working slider and nothing else.
+    // the reverse. A hand-written entry of just id, name and host is meant to
+    // give you a working slider and nothing else.
     volumeSlider: device.volumeSlider !== false,
     sliderService: resolveSliderService(device.sliderService, platformSlider, warnings, label),
     mute: device.mute === true,
     battery: device.battery === true,
+    reboot: device.reboot === true,
     volumePresets: validatePresets(device.volumePresets, label, warnings),
   }
   if (typeof device.model === 'string' && device.model.trim().length > 0) {
@@ -409,22 +427,37 @@ function validateDevice(input: {
 export function validateConfig(config: unknown): ConfigValidationResult {
   const errors: string[] = []
   const warnings: string[] = []
+  const noOptions: ResolvedPlatformOptions = { rebootAll: false, rebootAllName: undefined }
 
   if (typeof config !== 'object' || config === null) {
-    return { errors: ['platform configuration is missing'], warnings, devices: [] }
+    return {
+      errors: ['platform configuration is missing'],
+      warnings,
+      devices: [],
+      options: noOptions,
+    }
   }
   const platform = config as Partial<BluOSPlatformConfig>
   const rawDevices = platform.devices
+  const options: ResolvedPlatformOptions = {
+    rebootAll: platform.options?.rebootAll === true,
+    // A warning rather than an error, and the default rather than nothing: a
+    // rejected name should cost the user their label, not their switch.
+    rebootAllName: platform.options?.rebootAllName === undefined
+      ? undefined
+      : validateName(platform.options.rebootAllName, 'the reboot all switch', warnings),
+  }
 
   if (rawDevices === undefined) {
     return {
       errors: ['configuration has no "devices" list; open the plugin settings and run discovery'],
       warnings,
       devices: [],
+      options,
     }
   }
   if (!Array.isArray(rawDevices)) {
-    return { errors: ['configuration "devices" must be a list'], warnings, devices: [] }
+    return { errors: ['configuration "devices" must be a list'], warnings, devices: [], options }
   }
 
   const platformSlider = platform.options?.sliderService
@@ -453,16 +486,20 @@ export function validateConfig(config: unknown): ConfigValidationResult {
   }
 
   const exposed = devices.filter(
-    (device) => device.volumeSlider || device.mute || device.battery || device.volumePresets.length > 0,
+    (device) => device.volumeSlider
+      || device.mute
+      || device.battery
+      || device.reboot
+      || device.volumePresets.length > 0,
   )
-  if (devices.length > 0 && exposed.length === 0) {
+  if (devices.length > 0 && exposed.length === 0 && !options.rebootAll) {
     warnings.push(
-      'no device has a volume slider, mute switch, battery sensor or volume preset enabled, '
-      + 'so nothing will appear in HomeKit',
+      'no device has a volume slider, mute switch, battery sensor, reboot switch or volume '
+      + 'preset enabled, so nothing will appear in HomeKit',
     )
   }
 
-  return { errors, warnings, devices }
+  return { errors, warnings, devices, options }
 }
 
 /**
@@ -475,6 +512,7 @@ export function validateConfig(config: unknown): ConfigValidationResult {
 export function resolveAccessories(
   devices: readonly ResolvedDevice[],
   warnings?: string[],
+  platform?: { rebootAll: boolean; rebootAllName?: string | undefined; name: string },
 ): ResolvedAccessory[] {
   const accessories: ResolvedAccessory[] = []
   for (const device of devices) {
@@ -508,6 +546,14 @@ export function resolveAccessories(
         sliderService: device.sliderService,
       })
     }
+    if (device.reboot) {
+      accessories.push({
+        kind: 'reboot',
+        deviceId: device.id,
+        name: suffixName(device.name, 'Reboot'),
+        sliderService: device.sliderService,
+      })
+    }
     for (const preset of device.volumePresets) {
       accessories.push({
         kind: 'volumePreset',
@@ -517,6 +563,20 @@ export function resolveAccessories(
         volume: preset.volume,
       })
     }
+  }
+  // Last, and outside the loop: it belongs to the platform, not to any player,
+  // and it exists even when no device is configured — which is exactly the case
+  // where a network sweep is the only way to reach anything.
+  if (platform?.rebootAll === true) {
+    accessories.push({
+      kind: 'rebootAll',
+      deviceId: PLATFORM_DEVICE_ID,
+      // Taken bare when the user named it, unlike a player's accessories: they
+      // are suffixed so several tiles for one room stay tellable apart, and this
+      // is the one accessory with no room and no siblings.
+      name: platform.rebootAllName ?? suffixName(platform.name, 'Reboot All'),
+      sliderService: 'fan',
+    })
   }
   const names = new Map<string, number>()
   for (const accessory of accessories) {

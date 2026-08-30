@@ -146,7 +146,7 @@ describe('parseSyncStatus', () => {
     })
 
     it('reads a grouped zone of a multi-zone chassis without confusing it for its sibling', () => {
-      // Both recorded from one CI-S2 while its two zones were grouped together:
+      // Both recorded from one CI S2 while its two zones were grouped together:
       // one NIC, one MAC, and the port is the only thing telling them apart.
       const leader = parseSyncStatus(SYNC_STATUS_GROUP_PRIMARY, '192.168.4.14:11000')
       const follower = parseSyncStatus(SYNC_STATUS_GROUP_SECONDARY, '192.168.4.14:11010')

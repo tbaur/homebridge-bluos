@@ -179,6 +179,10 @@ class BluOSUiServer extends HomebridgePluginUiServer {
         volumeSlider: player.fixedVolume !== true,
         mute: false,
         battery: player.hasBattery === true,
+        // Never suggested. Restarting a player interrupts whatever it is doing,
+        // so it should be a thing the user asked for rather than a default they
+        // inherited from pressing Discover.
+        reboot: false,
       },
     }
   }

@@ -23,7 +23,7 @@
 import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
 import { BluOSClient, type Endpoint } from './api/client';
 import type { VolumeResult } from './api/sync-status';
-import { type AccessoryHost } from './devices';
+import { type AccessoryHost, type RebootTarget } from './devices';
 import type { PlayerObservation } from './types';
 /** The BluOS dynamic platform. */
 export declare class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
@@ -67,6 +67,37 @@ export declare class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHo
      * for each of them is sustained disk churn on the SD card of a typical host.
      */
     persistContext(accessory?: PlatformAccessory): void;
+    /**
+     * Every address the global reboot switch should restart.
+     *
+     * Keyed on host alone, not host and port. Reboot is served on port 80, which is
+     * one server per chassis, so the two zones of a CI S2 are one target: sending
+     * twice would only aim a second request at a box already going down. Each
+     * target carries every player behind it so the log can name what is really
+     * about to stop.
+     *
+     * The union of what is configured and what mDNS answers for. Both halves are
+     * needed: discovery alone does nothing on a network that filters multicast,
+     * which is the case the manual-address fallback exists for, and the configured
+     * list alone would miss the players this switch is advertised as reaching.
+     *
+     * Configured players are added first so their names win. A user who called a
+     * player "Kitchen" in the plugin settings should read "Kitchen" in the log, not
+     * whatever it is called in the BluOS app.
+     *
+     * A failed sweep degrades to the configured list rather than failing the press,
+     * because rebooting the boxes we are sure of beats rebooting none of them.
+     */
+    rebootTargets(): Promise<readonly RebootTarget[]>;
+    /**
+     * Other configured players that share an address with this one.
+     *
+     * They will go down with it, because reboot cannot be aimed at one zone of a
+     * chassis. Configured players only: a zone the user never exposed still
+     * restarts, but naming it would mean reporting on equipment this plugin was
+     * not asked to manage.
+     */
+    playersSharingAddress(deviceId: string): readonly string[];
     private start;
     private stop;
     /**

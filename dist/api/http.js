@@ -5,7 +5,7 @@
  * Licensed under the Apache License, Version 2.0
  * See LICENSE file for full license text
  *
- * @fileoverview Minimal HTTP GET against a BluOS player.
+ * @fileoverview Minimal HTTP against a BluOS player.
  *
  * Built on `node:http` rather than `fetch` for two reasons.
  *
@@ -22,24 +22,32 @@
  * with an explicit "drop the hold before writing" dance. Opening a fresh
  * connection each time removes the failure mode instead of managing it, and on
  * a LAN a handshake every hundred seconds costs nothing.
+ *
+ * GET covers the whole API bar one. Reboot is POST, so the machinery below is
+ * shared rather than duplicated: the timeout handling is the subtle part, and
+ * two copies of it would drift.
  */
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.httpGet = void 0;
+exports.httpPost = exports.httpGet = void 0;
 const node_http_1 = __importDefault(require("node:http"));
 const errors_1 = require("../utils/errors");
 /**
- * GET a URL with independent connect and total deadlines.
+ * Issue one request with independent connect and total deadlines.
  *
  * Rejects with {@link ConnectionError} for anything that prevented an answer,
  * and {@link ProtocolError} when the answer arrived but was unusable (over the
  * size cap). Redirects are not followed: BluOS control endpoints do not issue
  * them, and blindly following one would let a compromised player redirect us
  * at an arbitrary host.
+ *
+ * Every `ConnectionError` carries whether the request had already reached the
+ * socket, so a caller that can treat a half-finished exchange as success — only
+ * reboot — is able to tell the two apart. See {@link ConnectionError}.
  */
-const httpGet = (url, options) => {
+function perform(method, url, options, body) {
     const { connectTimeoutMs, totalTimeoutMs, maxBytes, signal } = options;
     return new Promise((resolve, reject) => {
         if (signal?.aborted === true) {
@@ -47,13 +55,27 @@ const httpGet = (url, options) => {
             return;
         }
         let settled = false;
+        // Delivery needs both halves. `finish` alone is not enough: Node buffers a
+        // request whose socket has not connected yet and emits `finish` regardless,
+        // so a connection that never completed would otherwise claim the player had
+        // heard us.
+        let connected = false;
+        let written = false;
         let onAbort;
         // Held in a container because `cleanup` closes over it before the timer that
         // fills it in can be created: the timer's callback needs `fail`, and `fail`
         // needs `cleanup`.
         const timers = {};
+        const headers = body === undefined
+            ? {}
+            : {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                // Explicit, so the request never falls back to chunked encoding. A
+                // player's minimal HTTP server is likelier to handle a plain body.
+                'Content-Length': String(Buffer.byteLength(body)),
+            };
         // `agent: false` gives this request its own connection and closes it after.
-        const request = node_http_1.default.get(url, { agent: false }, (response) => {
+        const request = node_http_1.default.request(url, { method, agent: false, headers }, (response) => {
             const chunks = [];
             let received = 0;
             response.on('data', (chunk) => {
@@ -97,8 +119,13 @@ const httpGet = (url, options) => {
             settled = true;
             cleanup();
             request.destroy();
-            reject(error);
+            reject(error instanceof errors_1.ConnectionError && connected && written
+                ? new errors_1.ConnectionError(error.message, { cause: error.cause, delivered: true })
+                : error);
         };
+        request.on('finish', () => {
+            written = true;
+        });
         // Applies until the socket connects, then swapped for the total deadline.
         request.setTimeout(connectTimeoutMs, () => {
             fail(new errors_1.ConnectionError(`connect timed out after ${connectTimeoutMs}ms`));
@@ -107,6 +134,7 @@ const httpGet = (url, options) => {
             const onConnect = () => {
                 // Connected: inactivity is now expected, because a long-poll is idle by
                 // design. The total deadline below is what bounds the request from here.
+                connected = true;
                 request.setTimeout(0);
                 socket.setNoDelay(true);
             };
@@ -131,6 +159,18 @@ const httpGet = (url, options) => {
             };
             signal.addEventListener('abort', onAbort, { once: true });
         }
+        request.end(body);
     });
-};
+}
+/** GET a URL with independent connect and total deadlines. */
+const httpGet = (url, options) => perform('GET', url, options);
 exports.httpGet = httpGet;
+/**
+ * POST a form-encoded body.
+ *
+ * Only reboot needs this: it is the one BluOS command that is not a GET. The
+ * body is built with `URLSearchParams` rather than by hand so a value can never
+ * break out of its field.
+ */
+const httpPost = (url, form, options) => (perform('POST', url, options, new URLSearchParams(form).toString()));
+exports.httpPost = httpPost;

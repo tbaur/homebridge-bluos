@@ -9,7 +9,7 @@
  *
  * Accessory identity must survive a DHCP lease change, so it is built from the
  * chassis MAC and the zone's control port, never from an address. Verified on
- * firmware 4.16.6 against a NAD CI-S2, where the primary zone reports
+ * firmware 4.16.6 against a NAD CI S2, where the primary zone reports
  * `mac="90:56:82:0A:00:01"` and its secondary zone reports the same NIC with a
  * port suffix, `mac="90:56:82:0A:00:01:11010"`.
  */

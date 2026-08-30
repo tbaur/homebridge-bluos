@@ -64,7 +64,7 @@ Example: `feat: expose a battery sensor for portable players`
 2. Ensure CI passes (build, lint, typecheck, tests, `dist/` in sync)
 3. Request review from maintainers
 
-> `CHANGELOG.md` is generated automatically by release-please from your Conventional Commit / PR titles — do not edit it by hand. See [RELEASING.md](RELEASING.md).
+> `CHANGELOG.md` is generated automatically by release-please from your Conventional Commit and PR titles. Do not edit it by hand. See [RELEASING.md](RELEASING.md).
 
 ### PR Checklist
 
@@ -76,11 +76,11 @@ Example: `feat: expose a battery sensor for portable players`
 
 ## Adding a Capability
 
-New accessories are welcome — the plugin is meant to cover everything about a BluOS player that HomeKit can express well, and the [roadmap](README.md#roadmap) is a list of openings rather than a closed plan. See [DEVELOPMENT.md](DEVELOPMENT.md#adding-a-capability) for the mechanics and [docs/PROTOCOL.md](docs/PROTOCOL.md) for the API surface already mapped. Three things are worth knowing before you start:
+New accessories are welcome. The plugin is meant to cover everything about a BluOS player that HomeKit can express well, and the [roadmap](docs/README-DETAILED.md#roadmap) is a list of openings, not a closed plan. See [DEVELOPMENT.md](DEVELOPMENT.md#adding-a-capability) for the mechanics and [docs/PROTOCOL.md](docs/PROTOCOL.md) for the API surface already mapped. Three things are worth knowing before you start:
 
-- **The test is whether HomeKit expresses it well, not whether the API offers it.** A tile, a scene, an automation trigger or a spoken command is a good fit. Browsing a library, editing a queue or showing artwork is not: HomeKit cannot render any of it, so the result would be a worse version of the BluOS app. A PR in that direction will be declined on those grounds rather than on quality — please open an issue first if you are unsure which side of the line something falls on.
-- **Verify against hardware.** Where the specification and a real player disagree, the player wins. Record the measurement in `docs/PROTOCOL.md` and add a fixture under `tests/fixtures/` if the response shape is new. `scripts/` has the tools: `smoke.js` to check the whole path, `capture-fixture.js` to record a response, and `pseudonymise.js` to strip your addresses, MAC addresses and room names before you commit one. **Never commit a raw capture** — a fixture guard will fail the build, but the point is not to get that far.
-- **Do not break someone's rooms.** Accessory identity is what keeps a tile attached to its room, scenes and automations. Adding a capability must not change the identity of an existing accessory; if it needs to, say so explicitly in the PR so it can be handled as a migration rather than as a surprise.
+- **The test is whether HomeKit expresses it well, not whether the API offers it.** A tile, a scene, an automation trigger or a spoken command is a good fit. Browsing a library, editing a queue or showing artwork is not: HomeKit cannot render any of it, so the result would be a worse version of the BluOS app. A PR in that direction will be declined on those grounds, not on quality. Please open an issue first if you are unsure which side of the line something falls on.
+- **Verify against hardware.** Where the specification and a real player disagree, the player wins. Record the measurement in `docs/PROTOCOL.md` and add a fixture under `tests/fixtures/` if the response shape is new. `scripts/` has the tools: `smoke.js` to check the whole path, `capture-fixture.js` to record a response, and `pseudonymise.js` to strip your addresses, MAC addresses and room names before you commit one. **Never commit a raw capture.** A fixture guard will fail the build, but the point is not to get that far.
+- **Do not break someone's rooms.** Accessory identity is what keeps a tile attached to its room, scenes and automations. Adding a capability must not change the identity of an existing accessory. If it needs to, say so explicitly in the PR, so it can be handled as a migration and not as a surprise.
 
 ## Reporting Bugs
 

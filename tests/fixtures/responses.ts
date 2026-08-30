@@ -44,7 +44,7 @@ export const SYNC_STATUS_C658 = load('nad-c658.syncstatus.xml')
 export const VOLUME_C658 = load('nad-c658.volume.xml')
 
 /**
- * NAD CI-S2, the zone on port 11000. Reports the chassis MAC with no suffix.
+ * NAD CI S2, the zone on port 11000. Reports the chassis MAC with no suffix.
  *
  * Pairs with {@link SYNC_STATUS_CI_S2_ZONE_TWO}: the same physical box, the same
  * NIC, two independently controllable zones. This is why a MAC alone cannot key
@@ -89,7 +89,7 @@ export const SYNC_STATUS_SOUNDBAR = load('bluesound-p430-soundbar.syncstatus.xml
 export const SYNC_STATUS_BATTERY = load('bluesound-p125-battery.syncstatus.xml')
 
 /**
- * A live group leader, recorded while two zones of one CI-S2 were grouped.
+ * A live group leader, recorded while two zones of one CI S2 were grouped.
  *
  * One `<slave>` child per follower, carrying the follower's address, port and
  * name, plus a `group` attribute naming the members for display. This is what

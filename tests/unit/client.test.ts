@@ -12,7 +12,7 @@
  */
 
 import { BluOSClient } from '../../src/api/client'
-import type { HttpGet, HttpGetOptions } from '../../src/api/http'
+import type { HttpGet, HttpGetOptions, HttpPost } from '../../src/api/http'
 import {
   CONTROL_RATE_LIMIT_MS,
   LONG_POLL_SEC,
@@ -61,6 +61,16 @@ function recordingHttp(body: string | ((url: string) => string), status = 200) {
     return { status, body: typeof body === 'string' ? body : body(url) }
   }
   return { calls, httpGet }
+}
+
+function recordingPost(body = '', status = 200) {
+  const calls: { url: string, form: Record<string, string>, options: HttpGetOptions }[] = []
+  const httpPost: HttpPost = async (url, form, options) => {
+    calls.push({ url, form, options })
+    await Promise.resolve()
+    return { status, body }
+  }
+  return { calls, httpPost }
 }
 
 const endpoint = { host: '192.168.4.11', port: 11_010 }
@@ -287,6 +297,87 @@ describe('BluOSClient', () => {
 
       await expect(failing).rejects.toThrow(ConnectionError)
       await expect(following).resolves.toMatchObject({ level: 60 })
+    })
+  })
+
+  describe('reboot', () => {
+    it('POSTs to port 80, not to the zone\'s control port', async () => {
+      // /reboot is served on port 80 and answers 404 on the control ports, so
+      // targeting the endpoint's own port reaches nothing at all.
+      const { calls, httpPost } = recordingPost()
+      const client = new BluOSClient({ log: logger(), httpPost, ...fakeTiming() })
+
+      await expect(client.reboot('192.168.4.11')).resolves.toEqual({ acknowledged: true })
+      expect(calls).toHaveLength(1)
+      expect(calls[0]?.url).toBe('http://192.168.4.11/reboot')
+      expect(calls[0]?.form).toEqual({ noheader: '0', yes: '1' })
+    })
+
+    it('treats a lost connection as success once the player had the request', async () => {
+      // A player that is restarting cannot finish answering. Insisting on a clean
+      // response would report failure exactly when the command worked.
+      const httpPost = async (): Promise<never> => {
+        throw new ConnectionError('request failed', { delivered: true })
+      }
+      const client = new BluOSClient({ log: logger(), httpPost, ...fakeTiming() })
+
+      await expect(client.reboot('192.168.4.11')).resolves.toEqual({ acknowledged: false })
+    })
+
+    it('still fails when it never reached the player', async () => {
+      const httpPost = async (): Promise<never> => {
+        throw new ConnectionError('connect timed out after 2000ms')
+      }
+      const client = new BluOSClient({ log: logger(), httpPost, ...fakeTiming() })
+
+      await expect(client.reboot('192.168.4.11')).rejects.toThrow(ConnectionError)
+    })
+
+    it('treats a non-200 answer as a protocol error', async () => {
+      const { httpPost } = recordingPost('404 page not found', 404)
+      const client = new BluOSClient({ log: logger(), httpPost, ...fakeTiming() })
+
+      await expect(client.reboot('192.168.4.11')).rejects.toThrow(ProtocolError)
+    })
+
+    it('applies the same host check as every other call', async () => {
+      const { calls, httpPost } = recordingPost()
+      const client = new BluOSClient({ log: logger(), httpPost, ...fakeTiming() })
+
+      await expect(client.reboot('192.168.4.11/x')).rejects.toThrow(ConnectionError)
+      expect(calls).toHaveLength(0)
+    })
+
+    it('waits out the same-resource gap between two presses on one box', async () => {
+      const { httpPost } = recordingPost()
+      const timing = fakeTiming()
+      const client = new BluOSClient({ log: logger(), httpPost, ...timing })
+
+      await client.reboot('192.168.4.11')
+      await client.reboot('192.168.4.11')
+
+      expect(timing.sleeps.some((ms) => ms > 0 && ms <= SAME_RESOURCE_MIN_GAP_MS)).toBe(true)
+    })
+
+    it('does not serialise behind a volume write to the same box', async () => {
+      // Reboot skips the per-chassis lock on purpose: a box holding its socket
+      // until timeout must not delay anything queued behind it.
+      let release: (() => void) | undefined
+      const httpGet: HttpGet = async () => {
+        await new Promise<void>((resolve) => {
+          release = resolve
+        })
+        return { status: 200, body: VOLUME_CI_S2_ZONE_TWO }
+      }
+      const { httpPost } = recordingPost()
+      const client = new BluOSClient({ log: logger(), httpGet, httpPost, ...fakeTiming() })
+
+      const held = client.setVolume(endpoint, 10)
+      const rebooting = client.reboot('192.168.4.11')
+
+      await expect(rebooting).resolves.toEqual({ acknowledged: true })
+      release?.()
+      await expect(held).resolves.toMatchObject({ level: 60 })
     })
   })
 

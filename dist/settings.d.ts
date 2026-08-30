@@ -23,6 +23,15 @@ export declare const PLATFORM_NAME = "BluOS";
  * the rooms, scenes and automations the user built on top of them.
  */
 export declare const UUID_PREFIX = "homebridge-bluos:";
+/**
+ * Stands in for a player id on the accessories that belong to the platform.
+ *
+ * Only the "reboot everything" switch uses it. Accessory identity is built from
+ * a device id, and that switch has no device, so it needs a value that is stable
+ * for the life of the install and can never collide with a real player. A real
+ * id is a MAC and port or a `gen-` UUID; neither can look like this.
+ */
+export declare const PLATFORM_DEVICE_ID = "platform:all";
 /** Reported when `package.json` cannot be read. */
 export declare const UNKNOWN_PLUGIN_VERSION = "0.0.0";
 /** Manufacturer shown when `/SyncStatus` does not report a brand. */
@@ -35,7 +44,7 @@ export declare const DEFAULT_BLUOS_PORT = 11000;
  * Ports the specification documents for multi-zone chassis.
  *
  * API v1.7 section 1: the CI 580 exposes four streamer nodes on one IP, using
- * 11000, 11010, 11020 and 11030. The CI-S2 uses 11000 and 11010. Ports outside
+ * 11000, 11010, 11020 and 11030. The CI S2 uses 11000 and 11010. Ports outside
  * this set are accepted but warned about, because mDNS SRV records are the
  * authority on which port a zone actually listens to.
  */
@@ -69,6 +78,27 @@ export declare const CONNECT_TIMEOUT_MS = 2500;
 export declare const CONTROL_TIMEOUT_MS = 5000;
 /** Total timeout for a plain, non-long-poll status read. */
 export declare const STATUS_TIMEOUT_MS = 6000;
+/**
+ * Total timeout for a reboot request.
+ *
+ * Short on purpose. A player that is restarting cannot finish answering, so
+ * waiting longer only delays the point at which we accept a half-finished
+ * exchange as success. The sibling `bluos-controller` project uses 2 s against
+ * the same fleet; this leaves a little more room for a busy player.
+ */
+export declare const REBOOT_TIMEOUT_MS = 3000;
+/**
+ * The reboot resource, and the parameters that arm it.
+ *
+ * The one command in the API that is POST rather than GET, and the only one
+ * addressed without a BluOS port: `/reboot` is served on port 80 and answers 404
+ * on the control ports. The body mirrors the confirmation form that page serves,
+ * whose submit button is named `yes`. See the reboot section of
+ * docs/PROTOCOL.md.
+ */
+export declare const REBOOT_RESOURCE = "reboot";
+/** @see REBOOT_RESOURCE */
+export declare const REBOOT_FORM: Readonly<Record<string, string>>;
 /** Minimum spacing between control calls to one endpoint. */
 export declare const CONTROL_RATE_LIMIT_MS = 100;
 /** First reconnect delay after a failed poll. Doubles up to the ceiling. */
@@ -101,6 +131,15 @@ export declare const DEFAULT_RESTORE_VOLUME = 20;
  * to be imperceptible next to the LAN round trip.
  */
 export declare const SLIDER_COALESCE_MS = 150;
+/**
+ * How long a momentary switch stays on before it springs back.
+ *
+ * A reboot switch has no state to report: the player is either restarting or it
+ * is not, and neither is "on". Long enough that the Home app renders the press
+ * so the user sees the tap registered, short enough that the tile is not left
+ * looking like a thing that is still happening.
+ */
+export declare const MOMENTARY_RESET_MS = 1000;
 /** Lowest BluOS volume level. */
 export declare const VOLUME_MIN = 0;
 /** Highest BluOS volume level. */

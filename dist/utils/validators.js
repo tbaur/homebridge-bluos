@@ -319,12 +319,13 @@ function validateDevice(input) {
         port,
         // Absent means on, matching the schema default, the settings page and the
         // documented default. The other three accessories are opt-in, so they read
-        // the other way round; a hand-written entry of just id, name and host is
-        // meant to give you a working slider and nothing else.
+        // the reverse. A hand-written entry of just id, name and host is meant to
+        // give you a working slider and nothing else.
         volumeSlider: device.volumeSlider !== false,
         sliderService: resolveSliderService(device.sliderService, platformSlider, warnings, label),
         mute: device.mute === true,
         battery: device.battery === true,
+        reboot: device.reboot === true,
         volumePresets: validatePresets(device.volumePresets, label, warnings),
     };
     if (typeof device.model === 'string' && device.model.trim().length > 0) {
@@ -345,20 +346,35 @@ function validateDevice(input) {
 function validateConfig(config) {
     const errors = [];
     const warnings = [];
+    const noOptions = { rebootAll: false, rebootAllName: undefined };
     if (typeof config !== 'object' || config === null) {
-        return { errors: ['platform configuration is missing'], warnings, devices: [] };
+        return {
+            errors: ['platform configuration is missing'],
+            warnings,
+            devices: [],
+            options: noOptions,
+        };
     }
     const platform = config;
     const rawDevices = platform.devices;
+    const options = {
+        rebootAll: platform.options?.rebootAll === true,
+        // A warning rather than an error, and the default rather than nothing: a
+        // rejected name should cost the user their label, not their switch.
+        rebootAllName: platform.options?.rebootAllName === undefined
+            ? undefined
+            : validateName(platform.options.rebootAllName, 'the reboot all switch', warnings),
+    };
     if (rawDevices === undefined) {
         return {
             errors: ['configuration has no "devices" list; open the plugin settings and run discovery'],
             warnings,
             devices: [],
+            options,
         };
     }
     if (!Array.isArray(rawDevices)) {
-        return { errors: ['configuration "devices" must be a list'], warnings, devices: [] };
+        return { errors: ['configuration "devices" must be a list'], warnings, devices: [], options };
     }
     const platformSlider = platform.options?.sliderService;
     const devices = [];
@@ -383,12 +399,16 @@ function validateConfig(config) {
     else if (rawDevices.length === 0) {
         warnings.push('no devices are configured; open the plugin settings and run discovery');
     }
-    const exposed = devices.filter((device) => device.volumeSlider || device.mute || device.battery || device.volumePresets.length > 0);
-    if (devices.length > 0 && exposed.length === 0) {
-        warnings.push('no device has a volume slider, mute switch, battery sensor or volume preset enabled, '
-            + 'so nothing will appear in HomeKit');
+    const exposed = devices.filter((device) => device.volumeSlider
+        || device.mute
+        || device.battery
+        || device.reboot
+        || device.volumePresets.length > 0);
+    if (devices.length > 0 && exposed.length === 0 && !options.rebootAll) {
+        warnings.push('no device has a volume slider, mute switch, battery sensor, reboot switch or volume '
+            + 'preset enabled, so nothing will appear in HomeKit');
     }
-    return { errors, warnings, devices };
+    return { errors, warnings, devices, options };
 }
 /**
  * Expand validated devices into the accessories to expose.
@@ -397,7 +417,7 @@ function validateConfig(config) {
  * detected once: two accessories sharing a name still work, but they make Siri
  * ambiguous, which is worth a warning.
  */
-function resolveAccessories(devices, warnings) {
+function resolveAccessories(devices, warnings, platform) {
     const accessories = [];
     for (const device of devices) {
         // Whether a player reports a fixed output level is only knowable from a live
@@ -430,6 +450,14 @@ function resolveAccessories(devices, warnings) {
                 sliderService: device.sliderService,
             });
         }
+        if (device.reboot) {
+            accessories.push({
+                kind: 'reboot',
+                deviceId: device.id,
+                name: suffixName(device.name, 'Reboot'),
+                sliderService: device.sliderService,
+            });
+        }
         for (const preset of device.volumePresets) {
             accessories.push({
                 kind: 'volumePreset',
@@ -439,6 +467,20 @@ function resolveAccessories(devices, warnings) {
                 volume: preset.volume,
             });
         }
+    }
+    // Last, and outside the loop: it belongs to the platform, not to any player,
+    // and it exists even when no device is configured — which is exactly the case
+    // where a network sweep is the only way to reach anything.
+    if (platform?.rebootAll === true) {
+        accessories.push({
+            kind: 'rebootAll',
+            deviceId: settings_1.PLATFORM_DEVICE_ID,
+            // Taken bare when the user named it, unlike a player's accessories: they
+            // are suffixed so several tiles for one room stay tellable apart, and this
+            // is the one accessory with no room and no siblings.
+            name: platform.rebootAllName ?? suffixName(platform.name, 'Reboot All'),
+            sliderService: 'fan',
+        });
     }
     const names = new Map();
     for (const accessory of accessories) {
