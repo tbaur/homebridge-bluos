@@ -33,6 +33,46 @@ describe('RebootGrace', () => {
     expect(grace.isExpected(undefined)).toBe(false)
   })
 
+  it('does not treat a last-gasp reading as recovery', () => {
+    const grace = new RebootGrace(90_000, () => 1_000)
+    grace.expect('192.168.4.11')
+
+    grace.clearIfRecovered('192.168.4.11')
+
+    expect(grace.isExpected('192.168.4.11')).toBe(true)
+  })
+
+  it('ends the window once the address has gone quiet and then answered', () => {
+    const grace = new RebootGrace(90_000, () => 1_000)
+    grace.expect('192.168.4.11')
+    grace.clearIfRecovered('192.168.4.11')
+    grace.noteSilence('192.168.4.11')
+
+    grace.clearIfRecovered('192.168.4.11')
+
+    expect(grace.isExpected('192.168.4.11')).toBe(false)
+  })
+
+  it('does not record silence for an address that is not expected', () => {
+    const grace = new RebootGrace(90_000, () => 1_000)
+
+    grace.noteSilence('192.168.4.11')
+    grace.clearIfRecovered('192.168.4.11')
+
+    expect(grace.isExpected('192.168.4.11')).toBe(false)
+  })
+
+  it('forgets prior silence when the same address is expected again', () => {
+    const grace = new RebootGrace(90_000, () => 1_000)
+    grace.expect('192.168.4.11')
+    grace.noteSilence('192.168.4.11')
+    grace.expect('192.168.4.11')
+
+    grace.clearIfRecovered('192.168.4.11')
+
+    expect(grace.isExpected('192.168.4.11')).toBe(true)
+  })
+
   it('ends the window early when the address is cleared', () => {
     const grace = new RebootGrace(90_000, () => 1_000)
     grace.expect('192.168.4.11')

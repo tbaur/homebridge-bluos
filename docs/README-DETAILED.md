@@ -209,7 +209,7 @@ A per-player reboot switch on a shared chassis, at startup:
 [BluOS] Zone One Reboot: will also reboot Zone Two: they are zones of one chassis, and BluOS reboots the whole box
 ```
 
-After a reboot the other accessories stay quiet. The player is expected to stop answering, so they do not log `is not responding` or `is responding again`. The next successful poll writes whatever the player is actually doing into HomeKit. A player that is still silent after that window is logged as not responding, the usual way.
+After a reboot the other accessories stay quiet. The player is expected to stop answering, so they do not log `is not responding` or `is responding again`. A reading that arrives before the box actually drops is ignored for that purpose: the control ports often answer once more after the reboot is sent. The first successful poll after the silence writes whatever the player is actually doing into HomeKit. A player that is still silent after that window is logged as not responding, the usual way.
 
 A configuration the plugin will not act on:
 
