@@ -24,6 +24,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./context"), exports);
 __exportStar(require("./errors"), exports);
+__exportStar(require("./reboot-grace"), exports);
 __exportStar(require("./serial"), exports);
 __exportStar(require("./timing"), exports);
 __exportStar(require("./validators"), exports);

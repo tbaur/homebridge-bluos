@@ -378,7 +378,7 @@
       (value) => { player.battery = value },
     ))
     options.append(checkbox(
-      'Reboot switch (restarts this player, and any zone sharing its box)',
+      'Reboot switch (reboots this player, and any zone sharing its box)',
       player.reboot,
       false,
       (value) => { player.reboot = value },

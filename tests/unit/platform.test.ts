@@ -14,9 +14,9 @@
 import type { API, PlatformAccessory, PlatformConfig } from 'homebridge'
 
 import { BluOSPlatform } from '../../src/platform'
-import { PLATFORM_DEVICE_ID, PLATFORM_NAME, PLUGIN_NAME, UUID_PREFIX } from '../../src/settings'
+import { PLATFORM_DEVICE_ID, PLATFORM_NAME, PLUGIN_NAME, REBOOT_GRACE_MS, UUID_PREFIX } from '../../src/settings'
 import type { AccessoryContext, DiscoveredPlayer } from '../../src/types'
-import { fakeHap, FakeAccessory, fakeLogger, FakeService } from '../helpers/hap'
+import { fakeHap, FakeAccessory, fakeLogger, FakeService, observation } from '../helpers/hap'
 
 /**
  * Discovery is replaced with an inert stand-in: these tests are about the
@@ -668,6 +668,68 @@ describe('BluOSPlatform', () => {
       expect(targets).toHaveLength(1)
       expect(test.log.calls.some((line) => line.startsWith('warn')
         && line.includes('could not sweep the network'))).toBe(true)
+    })
+  })
+
+  describe('an expected reboot', () => {
+    // The poller's two sinks are private. These tests drive them directly so a
+    // reboot can be played out without standing up a live poll loop.
+    const timeout = () => new Error('request timed out after 6000ms')
+
+    it('does not warn while the box is coming back', () => {
+      const test = build({ devices: [device] })
+      test.launch()
+      test.platform['publish'](device.id, observation({ volume: 60 }), 'startup')
+      test.platform.expectReboot(device.host)
+
+      test.platform['reportUnavailable'](device.id, timeout())
+
+      expect(test.log.calls.some((line) => line.includes('is not responding'))).toBe(false)
+      expect(test.log.calls.some((line) => line.includes('is responding again'))).toBe(false)
+    })
+
+    it('writes the player\'s actual state when it answers again', () => {
+      const test = build({ devices: [device] })
+      test.launch()
+      test.platform['publish'](device.id, observation({ volume: 60 }), 'startup')
+      test.platform.expectReboot(device.host)
+      test.platform['reportUnavailable'](device.id, timeout())
+
+      test.platform['publish'](device.id, observation({ volume: 15, muted: true }), 'poll')
+
+      const volume = test.registered[0] as unknown as { getService: (name: string) => FakeService }
+      // A muted player reports level 0; the slider follows the device, not the last HomeKit value.
+      expect(volume.getService('Fanv2').lastValue('RotationSpeed')).toBe(0)
+      const mute = test.registered[1] as unknown as { getService: (name: string) => FakeService }
+      expect(mute.getService('Switch').lastValue('On')).toBe(true)
+      expect(test.log.calls.some((line) => line.includes('is responding again'))).toBe(false)
+    })
+
+    it('warns about a failure that follows the player coming back', () => {
+      const test = build({ devices: [device] })
+      test.launch()
+      test.platform.expectReboot(device.host)
+      test.platform['reportUnavailable'](device.id, timeout())
+      // Back on its feet with most of the window still to run. It ends anyway,
+      // so what happens next is judged as a real outage.
+      test.platform['publish'](device.id, observation({ volume: 60 }), 'poll')
+
+      test.platform['reportUnavailable'](device.id, timeout())
+
+      expect(test.log.calls.some((line) => line.startsWith('warn')
+        && line.includes('is not responding'))).toBe(true)
+    })
+
+    it('warns the usual way once the grace window has ended', () => {
+      const test = build({ devices: [device] })
+      test.launch()
+      test.platform.expectReboot(device.host)
+      jest.advanceTimersByTime(REBOOT_GRACE_MS)
+
+      test.platform['reportUnavailable'](device.id, timeout())
+
+      expect(test.log.calls.some((line) => line.startsWith('warn')
+        && line.includes('is not responding'))).toBe(true)
     })
   })
 

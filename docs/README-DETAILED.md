@@ -38,9 +38,9 @@ Where HomeKit is genuinely better is the tile, the scene, the automation and the
 
 **Battery sensor.** Charge level, charging state and low-battery warning, for players with a battery pack fitted (PULSE FLEX with BP100, PULSE M).
 
-**Reboot switch.** Restarts the player. It springs back to off and ignores being switched off, so a scene or "turn everything off" cannot restart your stereo. It stays pressable while a player is showing No Response, which is exactly when you want it.
+**Reboot switch.** Reboots the player. It springs back to off and ignores being switched off, so a scene or "turn everything off" cannot reboot your stereo. It stays pressable while a player is showing No Response, which is exactly when you want it.
 
-On a multi-zone chassis it restarts both zones. BluOS serves reboot on the box's own web server, not on a zone's control port, so "Study Reboot" on a CI S2 also takes down the other room. There is no way to avoid this. The plugin names the other affected rooms in the log at startup.
+On a multi-zone chassis it reboots both zones. BluOS serves reboot on the box's own web server, not on a zone's control port, so "Study Reboot" on a CI S2 also takes down the other room. There is no way to avoid this. At startup the plugin warns, naming the other affected rooms.
 
 **Grouping awareness.** A zone that is leading a BluOS group moves the whole group, exactly as its slider does in the BluOS app. Every other zone moves alone. The scope is stated explicitly on every write, never left to the firmware default.
 
@@ -48,9 +48,9 @@ On a multi-zone chassis it restarts both zones. BluOS serves reboot on the box's
 
 ### For the whole install
 
-**Reboot all.** Off by default. One switch that restarts **every BluOS player it can find on the network**, not only the ones listed in your configuration. It sweeps with mDNS and adds your configured players, so it still works where multicast is filtered.
+**Reboot all.** Off by default. One switch that reboots **every BluOS player it can find on the network**, not only the ones listed in your configuration. It sweeps with mDNS and adds your configured players, so it still works where multicast is filtered.
 
-Every player is named in the Homebridge log before a single request goes out. One press sends one restart per box, so a multi-zone chassis restarts once and takes all of its zones with it. A box that cannot be reached is reported, and the rest still go.
+The info log is a count (`found 2 device(s), 3 player(s)`), then `2 of 2 device(s) rebooted`. The debug log names every box and the players on it before a request goes out. One press sends one reboot per box, so a multi-zone chassis reboots once and takes all of its zones with it. A box that cannot be reached is a warning (`could not reboot`), and the rest still go.
 
 Name it with `options.rebootAllName`. It is the one accessory with no room of its own, so you choose where it lives in the Home app.
 
@@ -88,7 +88,7 @@ Only one `BluOS` platform block is supported (`singular` in the schema). It can 
 | `devices` | ✓ | List of players. An empty list is allowed and warns. A missing or non-list value is an error |
 | `options.sliderService` | | `fan` (default) or `lightbulb`, for every slider |
 | `options.discoveryTimeoutSec` | | mDNS listening window, 1–30 seconds (default 5) |
-| `options.rebootAll` | | Expose one switch that restarts **every BluOS player on the network** (default false). Its reach is not limited to `devices[]` |
+| `options.rebootAll` | | Expose one switch that reboots **every BluOS player on the network** (default false). Its reach is not limited to `devices[]` |
 | `options.rebootAllName` | | What that switch is called in the Home app, so you can keep it in the room you want. Defaults to the plugin name followed by `Reboot All` |
 
 ### `devices[]` entries
@@ -103,7 +103,7 @@ Only one `BluOS` platform block is supported (`singular` in the schema). It can 
 | `sliderService` | | Override the platform slider style for this player. Empty means "use the platform setting". Changing it removes the old control from the accessory instead of leaving both |
 | `mute` | | Expose a mute switch (default false) |
 | `battery` | | Expose a battery sensor (default false, and only meaningful with a battery pack) |
-| `reboot` | | Expose a switch that restarts this player (default false). Restarting interrupts playback, and on a multi-zone chassis it restarts every zone on that box |
+| `reboot` | | Expose a switch that reboots this player (default false). Rebooting interrupts playback, and on a multi-zone chassis it reboots every zone on that box |
 | `volumePresets[]` | | `{ "name": "...", "volume": 0-100 }`. Duplicate levels on one player are skipped with a warning |
 
 ### A complete example
@@ -188,6 +188,29 @@ A HomeKit write that reached the player:
 
 Mute `ON` means muted. `(group)` means that zone is leading a BluOS group, so the write carried the followers.
 
+A Reboot All press. Info is the count and the result. Debug names every box.
+
+```text
+[BluOS] Downstairs Reboot: found 2 device(s), 3 player(s)
+[BluOS] Downstairs Reboot: rebooting 2 box(es) carrying 3 player(s): 192.168.4.11 (Zone One, Zone Two); 192.168.4.12 (Kitchen)
+[BluOS] Downstairs Reboot: 2 of 2 device(s) rebooted
+```
+
+The middle line is debug. A box that did not take the request is a warning:
+
+```text
+[BluOS] Downstairs Reboot: could not reboot 192.168.4.11 (Zone One, Zone Two): connect EHOSTUNREACH
+[BluOS] Downstairs Reboot: 1 of 2 device(s) rebooted
+```
+
+A per-player reboot switch on a shared chassis, at startup:
+
+```text
+[BluOS] Zone One Reboot: will also reboot Zone Two: they are zones of one chassis, and BluOS reboots the whole box
+```
+
+After a reboot the other accessories stay quiet. The player is expected to stop answering, so they do not log `is not responding` or `is responding again`. The next successful poll writes whatever the player is actually doing into HomeKit. A player that is still silent after that window is logged as not responding, the usual way.
+
 A configuration the plugin will not act on:
 
 ```text
@@ -232,9 +255,9 @@ Ordered by how well HomeKit expresses the thing, not by how easy it is to build.
 6. **A zone on a multi-zone chassis is missing.** Check the port. Zone two is 11010, not 11000
 7. **The volume moved but the slider did not, for a second.** A change made on the player takes one long-poll round trip to arrive. A change made from HomeKit is immediate
 8. **One zone's slider moved several rooms.** That zone is currently leading a BluOS group, so it carries its followers, the same as its slider in the BluOS app. Ungroup in the BluOS app and it goes back to moving alone
-9. **The reboot switch turns itself off.** This is by design. It is a button, not a state: it fires when switched on, then springs back. Switching it off does nothing, which is what stops a scene or "turn everything off" from restarting your stereo
-10. **Reboot All restarted a player you did not configure.** Also by design, and the reason it is off by default. It sweeps the network instead of reading `devices[]`. The log lists every player it is about to restart, by name and address
-11. **A reboot switch restarted the room next door.** Expect this on a multi-zone chassis such as a CI S2. BluOS serves `/reboot` on the box's own web server, not on a zone's control port, so there is no way to restart one zone of a shared box. The plugin logs a warning naming the other rooms when it starts
+9. **The reboot switch turns itself off.** This is by design. It is a button, not a state: it fires when switched on, then springs back. Switching it off does nothing, which is what stops a scene or "turn everything off" from rebooting your stereo
+10. **Reboot All rebooted a player you did not configure.** Also by design, and the reason it is off by default. It sweeps the network instead of reading `devices[]`. The info log is a count (`found … device(s), … player(s)`); the debug log lists every player by name and address
+11. **A reboot switch rebooted the room next door.** Expect this on a multi-zone chassis such as a CI S2. BluOS serves `/reboot` on the box's own web server, not on a zone's control port, so there is no way to reboot one zone of a shared box. At startup the plugin warns, naming the other rooms
 12. **100 is louder than you ever want.** Set the limit on the player, in the BluOS app's settings for it. The wording varies by model: a volume limit on Bluesound players, a maximum volume on NAD amplifiers. The plugin deliberately has no ceiling of its own, so a limit set on the player is enforced by the hardware for every controller. No HomeKit automation or misheard Siri phrase can exceed it, and a second limit here could only disagree with the first
 13. Restart Homebridge after editing `config.json` by hand
 

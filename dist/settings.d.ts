@@ -99,6 +99,15 @@ export declare const REBOOT_TIMEOUT_MS = 3000;
 export declare const REBOOT_RESOURCE = "reboot";
 /** @see REBOOT_RESOURCE */
 export declare const REBOOT_FORM: Readonly<Record<string, string>>;
+/**
+ * How long after a reboot request we treat silence as the player coming back.
+ *
+ * A reboot takes the control ports down with the box. Polls fail, and without
+ * this window every accessory on that box would warn "is not responding" and
+ * then info "is responding again" — which is exactly what a reboot looks like.
+ * After this window a still-silent player is logged the usual way.
+ */
+export declare const REBOOT_GRACE_MS = 90000;
 /** Minimum spacing between control calls to one endpoint. */
 export declare const CONTROL_RATE_LIMIT_MS = 100;
 /** First reconnect delay after a failed poll. Doubles up to the ceiling. */

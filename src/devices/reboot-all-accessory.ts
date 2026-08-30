@@ -13,9 +13,10 @@
  *
  * Its reach is wider than the plugin's configuration: it restarts every player
  * mDNS answers for, including ones deliberately left out of `devices[]`. That is
- * what it is for, and it is why the option is off by default and why every target
- * is named in the log before a single request goes out. The BluOS API has no
- * authentication, so anything on the segment will comply.
+ * what it is for, and it is why the option is off by default. The info log is a
+ * count of devices and players; the debug log names every box before a single
+ * request goes out. The BluOS API has no authentication, so anything on the
+ * segment will comply.
  *
  * It works in addresses rather than players, because reboot is served on port 80
  * and port 80 is one server per chassis. A CI S2 carrying two zones is one
@@ -61,7 +62,7 @@ export class RebootAllAccessory extends BaseAccessory {
         const targets = await this.host.rebootTargets()
         if (targets.length === 0) {
           this.host.log.warn(
-            `${forLog(this.displayName)} found nothing to restart. `
+            `${forLog(this.displayName)}: found nothing to reboot. `
             + 'Multicast may be filtered on this network and no players are configured',
           )
           return
@@ -74,13 +75,16 @@ export class RebootAllAccessory extends BaseAccessory {
     }
   }
 
-  /** Name everything that is about to go down, before any of it does. */
+  /** Count at info, name every box at debug, before any request goes out. */
   private announce(targets: readonly RebootTarget[]): void {
+    const players = playerCount(targets)
+    this.host.log.info(
+      `${forLog(this.displayName)}: found ${targets.length} device(s), ${players} player(s)`,
+    )
     const listed = targets
       .map((target) => `${target.host} (${target.names.map(forLog).join(', ')})`)
       .join('; ')
-    const players = targets.reduce((total, target) => total + target.names.length, 0)
-    this.host.log.info(
+    this.host.log.debug(
       `${forLog(this.displayName)}: rebooting ${targets.length} box(es) carrying `
       + `${players} player(s): ${listed}`,
     )
@@ -103,19 +107,23 @@ export class RebootAllAccessory extends BaseAccessory {
     let failed = 0
     outcomes.forEach((outcome, index) => {
       const target = targets[index]
-      if (outcome.status === 'fulfilled' || target === undefined) {
+      if (target === undefined) {
+        return
+      }
+      if (outcome.status === 'fulfilled') {
+        this.host.expectReboot(target.host)
         return
       }
       failed += 1
       this.host.log.warn(
-        `${forLog(this.displayName)} could not reboot ${target.host} `
+        `${forLog(this.displayName)}: could not reboot ${target.host} `
         + `(${target.names.map(forLog).join(', ')}): ${describeError(outcome.reason)}`,
       )
     })
 
-    const restarted = targets.length - failed
+    const rebooted = targets.length - failed
     this.host.log.info(
-      `${forLog(this.displayName)}: ${restarted} of ${targets.length} box(es) took the reboot`,
+      `${forLog(this.displayName)}: ${rebooted} of ${targets.length} device(s) rebooted`,
     )
   }
 
@@ -157,4 +165,9 @@ export class RebootAllAccessory extends BaseAccessory {
   protected override markUnavailable(): void {
     // Intentionally empty. See the note above.
   }
+}
+
+/** How many player names sit behind the given boxes. */
+function playerCount(targets: readonly RebootTarget[]): number {
+  return targets.reduce((total, target) => total + target.names.length, 0)
 }

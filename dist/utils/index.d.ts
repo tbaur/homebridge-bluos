@@ -8,6 +8,7 @@
  */
 export * from './context';
 export * from './errors';
+export * from './reboot-grace';
 export * from './serial';
 export * from './timing';
 export * from './validators';

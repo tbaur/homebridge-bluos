@@ -53,19 +53,25 @@ describe('RebootAllAccessory', () => {
     expect(test.client.reboot).toHaveBeenCalledTimes(2)
     expect(test.client.reboot.mock.calls.map(([host]) => host))
       .toEqual(['192.168.4.11', '192.168.4.12'])
+    expect(test.expectedReboots).toEqual(['192.168.4.11', '192.168.4.12'])
   })
 
-  it('names every player that is about to go down, before any of it does', async () => {
+  it('counts devices at info and names every box at debug, before any of it does', async () => {
     // Naming only the address would understate the reach on a multi-zone box.
     const test = globalHarness({ rebootTargets: targets })
     new RebootAllAccessory(test)
 
     await test.service('Switch').getCharacteristic('On').write(true)
 
-    const announcement = test.log.calls
+    expect(test.log.calls.some((line) => line === 'info BluOS Reboot All: found 2 device(s), 3 player(s)'))
+      .toBe(true)
+    const listed = test.log.calls
       .find((line) => line.includes('rebooting 2 box(es) carrying 3 player(s)'))
-    expect(announcement).toContain('192.168.4.11 (Zone One, Zone Two)')
-    expect(announcement).toContain('192.168.4.12 (Kitchen)')
+    expect(listed).toMatch(/^debug /)
+    expect(listed).toContain('192.168.4.11 (Zone One, Zone Two)')
+    expect(listed).toContain('192.168.4.12 (Kitchen)')
+    expect(test.log.calls.some((line) => line === 'info BluOS Reboot All: 2 of 2 device(s) rebooted'))
+      .toBe(true)
   })
 
   it('does nothing when switched off', async () => {
@@ -85,7 +91,7 @@ describe('RebootAllAccessory', () => {
     await test.service('Switch').getCharacteristic('On').write(true)
 
     expect(test.log.calls.some((line) => line.startsWith('warn')
-      && line.includes('nothing to restart'))).toBe(true)
+      && line.includes('nothing to reboot'))).toBe(true)
     expect(test.client.reboot).not.toHaveBeenCalled()
   })
 
@@ -104,8 +110,9 @@ describe('RebootAllAccessory', () => {
     expect(test.client.reboot).toHaveBeenCalledTimes(2)
     expect(test.log.calls.some((line) => line.startsWith('warn')
       && line.includes('Zone One, Zone Two'))).toBe(true)
-    expect(test.log.calls.some((line) => line.includes('1 of 2 box(es) took the reboot')))
+    expect(test.log.calls.some((line) => line === 'info BluOS Reboot All: 1 of 2 device(s) rebooted'))
       .toBe(true)
+    expect(test.expectedReboots).toEqual(['192.168.4.12'])
   })
 
   it('always reads off, and springs back after a press', async () => {

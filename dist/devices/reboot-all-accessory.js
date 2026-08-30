@@ -14,9 +14,10 @@
  *
  * Its reach is wider than the plugin's configuration: it restarts every player
  * mDNS answers for, including ones deliberately left out of `devices[]`. That is
- * what it is for, and it is why the option is off by default and why every target
- * is named in the log before a single request goes out. The BluOS API has no
- * authentication, so anything on the segment will comply.
+ * what it is for, and it is why the option is off by default. The info log is a
+ * count of devices and players; the debug log names every box before a single
+ * request goes out. The BluOS API has no authentication, so anything on the
+ * segment will comply.
  *
  * It works in addresses rather than players, because reboot is served on port 80
  * and port 80 is one server per chassis. A CI S2 carrying two zones is one
@@ -54,7 +55,7 @@ class RebootAllAccessory extends base_accessory_1.BaseAccessory {
             await this.completeWithinBudget('reboot all', async () => {
                 const targets = await this.host.rebootTargets();
                 if (targets.length === 0) {
-                    this.host.log.warn(`${(0, utils_1.forLog)(this.displayName)} found nothing to restart. `
+                    this.host.log.warn(`${(0, utils_1.forLog)(this.displayName)}: found nothing to reboot. `
                         + 'Multicast may be filtered on this network and no players are configured');
                     return;
                 }
@@ -66,13 +67,14 @@ class RebootAllAccessory extends base_accessory_1.BaseAccessory {
             this.scheduleReset();
         }
     }
-    /** Name everything that is about to go down, before any of it does. */
+    /** Count at info, name every box at debug, before any request goes out. */
     announce(targets) {
+        const players = playerCount(targets);
+        this.host.log.info(`${(0, utils_1.forLog)(this.displayName)}: found ${targets.length} device(s), ${players} player(s)`);
         const listed = targets
             .map((target) => `${target.host} (${target.names.map(utils_1.forLog).join(', ')})`)
             .join('; ');
-        const players = targets.reduce((total, target) => total + target.names.length, 0);
-        this.host.log.info(`${(0, utils_1.forLog)(this.displayName)}: rebooting ${targets.length} box(es) carrying `
+        this.host.log.debug(`${(0, utils_1.forLog)(this.displayName)}: rebooting ${targets.length} box(es) carrying `
             + `${players} player(s): ${listed}`);
     }
     /**
@@ -89,15 +91,19 @@ class RebootAllAccessory extends base_accessory_1.BaseAccessory {
         let failed = 0;
         outcomes.forEach((outcome, index) => {
             const target = targets[index];
-            if (outcome.status === 'fulfilled' || target === undefined) {
+            if (target === undefined) {
+                return;
+            }
+            if (outcome.status === 'fulfilled') {
+                this.host.expectReboot(target.host);
                 return;
             }
             failed += 1;
-            this.host.log.warn(`${(0, utils_1.forLog)(this.displayName)} could not reboot ${target.host} `
+            this.host.log.warn(`${(0, utils_1.forLog)(this.displayName)}: could not reboot ${target.host} `
                 + `(${target.names.map(utils_1.forLog).join(', ')}): ${(0, utils_1.describeError)(outcome.reason)}`);
         });
-        const restarted = targets.length - failed;
-        this.host.log.info(`${(0, utils_1.forLog)(this.displayName)}: ${restarted} of ${targets.length} box(es) took the reboot`);
+        const rebooted = targets.length - failed;
+        this.host.log.info(`${(0, utils_1.forLog)(this.displayName)}: ${rebooted} of ${targets.length} device(s) rebooted`);
     }
     /** Spring the tile back to off, the way a real button returns. */
     scheduleReset() {
@@ -131,3 +137,7 @@ class RebootAllAccessory extends base_accessory_1.BaseAccessory {
     }
 }
 exports.RebootAllAccessory = RebootAllAccessory;
+/** How many player names sit behind the given boxes. */
+function playerCount(targets) {
+    return targets.reduce((total, target) => total + target.names.length, 0);
+}

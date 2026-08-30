@@ -42,7 +42,7 @@
             "title": "Reboot All Switch",
             "type": "boolean",
             "default": false,
-            "description": "One switch that restarts every BluOS player it can find. Its reach is the whole network, not just the players listed below: pressing it also restarts players you have deliberately left out of this configuration. Every player is named in the Homebridge log before anything is sent."
+            "description": "One switch that reboots every BluOS player it can find. Its reach is the whole network, not just the players listed below: pressing it also reboots players you have deliberately left out of this configuration. The info log is a count of devices and players; the debug log names each box before anything is sent."
           },
           "rebootAllName": {
             "title": "Reboot All Name",
@@ -125,7 +125,7 @@
               "title": "Reboot Switch",
               "type": "boolean",
               "default": false,
-              "description": "A switch that restarts this player. It springs back to off on its own and does nothing when switched off, so a scene or \"turn everything off\" cannot trigger it. Restarting interrupts playback. On a multi-zone chassis such as a CI S2 it restarts every zone on that box: BluOS reboots the box, not the zone, and there is no way to restart just this room."
+              "description": "A switch that reboots this player. It springs back to off on its own and does nothing when switched off, so a scene or \"turn everything off\" cannot trigger it. Rebooting interrupts playback. On a multi-zone chassis such as a CI S2 it reboots every zone on that box: BluOS reboots the box, not the zone, and there is no way to reboot just this room."
             },
             "volumePresets": {
               "title": "Volume Presets",

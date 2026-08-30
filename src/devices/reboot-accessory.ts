@@ -57,7 +57,7 @@ export class RebootAccessory extends BaseAccessory {
     const shared = this.host.playersSharingAddress(this.deviceId)
     if (shared.length > 0) {
       this.host.log.warn(
-        `${forLog(this.displayName)} will also restart ${shared.map(forLog).join(', ')}: `
+        `${forLog(this.displayName)}: will also reboot ${shared.map(forLog).join(', ')}: `
         + 'they are zones of one chassis, and BluOS reboots the whole box',
       )
     }
@@ -75,6 +75,9 @@ export class RebootAccessory extends BaseAccessory {
         }
         // The host only: reboot lives on port 80, not on the zone's control port.
         const result = await this.host.client.reboot(endpoint.host)
+        // The box is going down. Tell the platform so the other accessories
+        // stay quiet, and so the next poll is what HomeKit shows.
+        this.host.expectReboot(endpoint.host)
         // Never a group operation. Grouping decides where a *volume* change
         // reaches; a reboot restarts a box and has no notion of followers.
         this.logAction(

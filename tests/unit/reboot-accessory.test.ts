@@ -47,7 +47,7 @@ describe('RebootAccessory', () => {
     new RebootAccessory(test)
 
     expect(test.log.calls.some((line) => line.startsWith('warn')
-      && line.includes('Zone One Reboot will also restart Zone Two')))
+      && line.includes('Zone One Reboot: will also reboot Zone Two')))
       .toBe(true)
   })
 
@@ -90,6 +90,25 @@ describe('RebootAccessory', () => {
     jest.runOnlyPendingTimers()
 
     expect(test.service('Switch').lastValue('On')).toBe(false)
+  })
+
+  it('tells the host to expect silence from the box it just rebooted', async () => {
+    const test = harness({ context: { kind: 'reboot' } })
+    new RebootAccessory(test)
+
+    await test.service('Switch').getCharacteristic('On').write(true)
+
+    expect(test.expectedReboots).toEqual(['192.168.4.11'])
+  })
+
+  it('does not expect silence when the reboot never left', async () => {
+    const test = harness({ context: { kind: 'reboot' }, endpoint: undefined })
+    new RebootAccessory(test)
+
+    await expect(test.service('Switch').getCharacteristic('On').write(true))
+      .rejects.toThrow(/no longer configured/)
+
+    expect(test.expectedReboots).toEqual([])
   })
 
   it('springs back even when the reboot failed', async () => {

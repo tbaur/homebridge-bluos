@@ -12,7 +12,7 @@
  * can tell a vendor requirement apart from a judgement call.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_NAME_LENGTH = exports.MAX_LOG_FIELD_LENGTH = exports.DISCOVERY_VERIFY_CONCURRENCY = exports.MAX_DISCOVERY_CANDIDATES = exports.MAX_DISCOVERY_RECORDS = exports.REDISCOVERY_MIN_INTERVAL_MS = exports.FAILURES_BEFORE_REDISCOVERY = exports.MAX_DISCOVERY_TIMEOUT_SEC = exports.MIN_DISCOVERY_TIMEOUT_SEC = exports.DEFAULT_DISCOVERY_TIMEOUT_SEC = exports.MDNS_SERVICE_SECONDARY = exports.MDNS_SERVICE_PRIMARY = exports.MAX_XML_ATTRIBUTES = exports.MAX_XML_ELEMENTS = exports.MAX_XML_DEPTH = exports.MAX_XML_BYTES = exports.MUTED_DB_SENTINEL = exports.FIXED_VOLUME_SENTINEL = exports.VOLUME_MAX = exports.VOLUME_MIN = exports.MOMENTARY_RESET_MS = exports.SLIDER_COALESCE_MS = exports.DEFAULT_RESTORE_VOLUME = exports.HOMEKIT_WRITE_BUDGET_MS = exports.POLL_FAILURE_REWARN_MS = exports.POLL_FAILURES_BEFORE_UNKNOWN = exports.POLL_BACKOFF_MAX_MS = exports.POLL_BACKOFF_BASE_MS = exports.CONTROL_RATE_LIMIT_MS = exports.REBOOT_FORM = exports.REBOOT_RESOURCE = exports.REBOOT_TIMEOUT_MS = exports.STATUS_TIMEOUT_MS = exports.CONTROL_TIMEOUT_MS = exports.CONNECT_TIMEOUT_MS = exports.SAME_RESOURCE_MIN_GAP_MS = exports.LONG_POLL_READ_SLACK_MS = exports.LONG_POLL_SEC = exports.MAX_PORT = exports.MIN_PORT = exports.DOCUMENTED_BLUOS_PORTS = exports.DEFAULT_BLUOS_PORT = exports.DEFAULT_MODEL = exports.DEFAULT_BRAND = exports.UNKNOWN_PLUGIN_VERSION = exports.PLATFORM_DEVICE_ID = exports.UUID_PREFIX = exports.PLATFORM_NAME = exports.PLUGIN_NAME = void 0;
+exports.MAX_NAME_LENGTH = exports.MAX_LOG_FIELD_LENGTH = exports.DISCOVERY_VERIFY_CONCURRENCY = exports.MAX_DISCOVERY_CANDIDATES = exports.MAX_DISCOVERY_RECORDS = exports.REDISCOVERY_MIN_INTERVAL_MS = exports.FAILURES_BEFORE_REDISCOVERY = exports.MAX_DISCOVERY_TIMEOUT_SEC = exports.MIN_DISCOVERY_TIMEOUT_SEC = exports.DEFAULT_DISCOVERY_TIMEOUT_SEC = exports.MDNS_SERVICE_SECONDARY = exports.MDNS_SERVICE_PRIMARY = exports.MAX_XML_ATTRIBUTES = exports.MAX_XML_ELEMENTS = exports.MAX_XML_DEPTH = exports.MAX_XML_BYTES = exports.MUTED_DB_SENTINEL = exports.FIXED_VOLUME_SENTINEL = exports.VOLUME_MAX = exports.VOLUME_MIN = exports.MOMENTARY_RESET_MS = exports.SLIDER_COALESCE_MS = exports.DEFAULT_RESTORE_VOLUME = exports.HOMEKIT_WRITE_BUDGET_MS = exports.POLL_FAILURE_REWARN_MS = exports.POLL_FAILURES_BEFORE_UNKNOWN = exports.POLL_BACKOFF_MAX_MS = exports.POLL_BACKOFF_BASE_MS = exports.CONTROL_RATE_LIMIT_MS = exports.REBOOT_GRACE_MS = exports.REBOOT_FORM = exports.REBOOT_RESOURCE = exports.REBOOT_TIMEOUT_MS = exports.STATUS_TIMEOUT_MS = exports.CONTROL_TIMEOUT_MS = exports.CONNECT_TIMEOUT_MS = exports.SAME_RESOURCE_MIN_GAP_MS = exports.LONG_POLL_READ_SLACK_MS = exports.LONG_POLL_SEC = exports.MAX_PORT = exports.MIN_PORT = exports.DOCUMENTED_BLUOS_PORTS = exports.DEFAULT_BLUOS_PORT = exports.DEFAULT_MODEL = exports.DEFAULT_BRAND = exports.UNKNOWN_PLUGIN_VERSION = exports.PLATFORM_DEVICE_ID = exports.UUID_PREFIX = exports.PLATFORM_NAME = exports.PLUGIN_NAME = void 0;
 exports.readPluginVersion = readPluginVersion;
 /** npm package name. Must match `package.json` `name` for Homebridge to load us. */
 exports.PLUGIN_NAME = 'homebridge-bluos';
@@ -104,6 +104,15 @@ exports.REBOOT_TIMEOUT_MS = 3_000;
 exports.REBOOT_RESOURCE = 'reboot';
 /** @see REBOOT_RESOURCE */
 exports.REBOOT_FORM = { noheader: '0', yes: '1' };
+/**
+ * How long after a reboot request we treat silence as the player coming back.
+ *
+ * A reboot takes the control ports down with the box. Polls fail, and without
+ * this window every accessory on that box would warn "is not responding" and
+ * then info "is responding again" — which is exactly what a reboot looks like.
+ * After this window a still-silent player is logged the usual way.
+ */
+exports.REBOOT_GRACE_MS = 90_000;
 /** Minimum spacing between control calls to one endpoint. */
 exports.CONTROL_RATE_LIMIT_MS = 100;
 /** First reconnect delay after a failed poll. Doubles up to the ceiling. */

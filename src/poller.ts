@@ -199,6 +199,18 @@ export class DevicePoller {
     this.interrupt()
   }
 
+  /**
+   * Drop the request in flight and start a plain read.
+   *
+   * Used after a reboot: the long-poll is aimed at a box that is already going
+   * down, and waiting it out only delays the first reading of whatever state the
+   * player comes back in.
+   */
+  refreshNow(): void {
+    this.etag = undefined
+    this.interrupt()
+  }
+
   /** Cancel the request in flight and wake any backoff sleep. */
   private interrupt(): void {
     this.abort?.abort()
