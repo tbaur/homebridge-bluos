@@ -438,4 +438,15 @@ describe('VolumeAccessory', () => {
       expect(test.service('Fanv2').getCharacteristic('RotationSpeed').read()).toBe(30)
     })
   })
+
+  it('carries the battery service when it is the host tile', () => {
+    const test = harness({ context: { kind: 'volume', hostsBattery: true } })
+    const accessory = new VolumeAccessory(test)
+
+    accessory.applyObservation(observation({ volume: 22, battery: { level: 40, charging: false } }), 'poll')
+
+    expect(test.service('Fanv2').lastValue('RotationSpeed')).toBe(22)
+    expect(test.service('Battery').lastValue('BatteryLevel')).toBe(40)
+    expect(test.service('Battery').lastValue('StatusLowBattery')).toBe(0)
+  })
 })

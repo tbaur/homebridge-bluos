@@ -32,6 +32,7 @@ const sync_status_1 = require("../api/sync-status");
 const settings_1 = require("../settings");
 const utils_1 = require("../utils");
 const base_accessory_1 = require("./base-accessory");
+const player_battery_1 = require("./player-battery");
 /** A volume slider for one player. */
 class VolumeAccessory extends base_accessory_1.BaseAccessory {
     surface;
@@ -41,12 +42,22 @@ class VolumeAccessory extends base_accessory_1.BaseAccessory {
     fixedVolume = false;
     /** Level awaiting a coalesced write. */
     pendingLevel;
+    /** Present when this slider also carries the player's battery. */
+    battery;
     /** In-flight coalesced write, shared by every handler that queued into it. */
     flush;
     constructor(init) {
         super(init);
         this.surface = this.buildSurface();
         this.bindHandlers();
+        this.battery = (0, player_battery_1.attachHostedBattery)({
+            hap: this.host.hap,
+            accessory: this.accessory,
+            displayName: this.displayName,
+            warnOnce: (key, message) => this.warnOnce(key, message),
+            communicationFailure: () => this.communicationFailure(),
+            hasObservedState: () => this.hasObservedState(),
+        }, this.context.hostsBattery === true);
     }
     buildSurface() {
         const { Characteristic: Char, Service: HapService } = this.host.hap;
@@ -190,6 +201,7 @@ class VolumeAccessory extends base_accessory_1.BaseAccessory {
                     + 'cannot do anything; disable the slider for this player in the plugin settings');
                 this.markUnavailable();
             }
+            this.battery?.apply(observation);
             return;
         }
         this.fixedVolume = false;
@@ -207,12 +219,14 @@ class VolumeAccessory extends base_accessory_1.BaseAccessory {
         const { Characteristic: Char } = this.host.hap;
         this.surface.service.updateCharacteristic(this.context.sliderService === 'lightbulb' ? Char.On : Char.Active, this.surface.toActiveValue(level > settings_1.VOLUME_MIN));
         this.surface.service.updateCharacteristic(this.context.sliderService === 'lightbulb' ? Char.Brightness : Char.RotationSpeed, level);
+        this.battery?.apply(observation);
     }
     markUnavailable() {
         const { Characteristic: Char } = this.host.hap;
         const error = this.communicationFailure();
         this.surface.service.updateCharacteristic(this.context.sliderService === 'lightbulb' ? Char.On : Char.Active, error);
         this.surface.service.updateCharacteristic(this.context.sliderService === 'lightbulb' ? Char.Brightness : Char.RotationSpeed, error);
+        this.battery?.markUnavailable();
     }
 }
 exports.VolumeAccessory = VolumeAccessory;

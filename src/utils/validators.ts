@@ -528,6 +528,9 @@ export function resolveAccessories(
         // ambiguous both on screen and to Siri.
         name: suffixName(device.name, 'Volume'),
         sliderService: device.sliderService,
+        // Home will not render a Battery accessory on its own. The service sits
+        // on this tile when a slider exists, so the charge icon appears there.
+        ...(device.battery ? { hostsBattery: true } : {}),
       })
     }
     if (device.mute) {
@@ -536,9 +539,11 @@ export function resolveAccessories(
         deviceId: device.id,
         name: suffixName(device.name, 'Mute'),
         sliderService: device.sliderService,
+        // Mute hosts the battery only when there is no slider to put it on.
+        ...(device.battery && !device.volumeSlider ? { hostsBattery: true } : {}),
       })
     }
-    if (device.battery) {
+    if (device.battery && !device.volumeSlider && !device.mute) {
       accessories.push({
         kind: 'battery',
         deviceId: device.id,

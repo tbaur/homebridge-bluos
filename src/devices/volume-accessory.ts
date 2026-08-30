@@ -38,6 +38,7 @@ import {
 import type { PlayerObservation, RefreshReason } from '../types'
 import { forLog, sleep } from '../utils'
 import { BaseAccessory, type AccessoryInit } from './base-accessory'
+import { attachHostedBattery, PlayerBattery } from './player-battery'
 
 /** The slider's HAP surface, whichever service is impersonating it. */
 interface SliderSurface {
@@ -61,6 +62,9 @@ export class VolumeAccessory extends BaseAccessory {
   /** Level awaiting a coalesced write. */
   private pendingLevel: number | undefined
 
+  /** Present when this slider also carries the player's battery. */
+  private readonly battery: PlayerBattery | undefined
+
   /** In-flight coalesced write, shared by every handler that queued into it. */
   private flush: Promise<void> | undefined
 
@@ -68,6 +72,14 @@ export class VolumeAccessory extends BaseAccessory {
     super(init)
     this.surface = this.buildSurface()
     this.bindHandlers()
+    this.battery = attachHostedBattery({
+      hap: this.host.hap,
+      accessory: this.accessory,
+      displayName: this.displayName,
+      warnOnce: (key, message) => this.warnOnce(key, message),
+      communicationFailure: () => this.communicationFailure(),
+      hasObservedState: () => this.hasObservedState(),
+    }, this.context.hostsBattery === true)
   }
 
   private buildSurface(): SliderSurface {
@@ -241,6 +253,7 @@ export class VolumeAccessory extends BaseAccessory {
         )
         this.markUnavailable()
       }
+      this.battery?.apply(observation)
       return
     }
     this.fixedVolume = false
@@ -266,6 +279,7 @@ export class VolumeAccessory extends BaseAccessory {
       this.context.sliderService === 'lightbulb' ? Char.Brightness : Char.RotationSpeed,
       level,
     )
+    this.battery?.apply(observation)
   }
 
   protected override markUnavailable(): void {
@@ -279,5 +293,6 @@ export class VolumeAccessory extends BaseAccessory {
       this.context.sliderService === 'lightbulb' ? Char.Brightness : Char.RotationSpeed,
       error,
     )
+    this.battery?.markUnavailable()
   }
 }

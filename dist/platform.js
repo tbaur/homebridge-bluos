@@ -404,6 +404,9 @@ class BluOSPlatform {
         if (Number.isInteger(previous?.lastNonZeroVolume)) {
             context.lastNonZeroVolume = previous?.lastNonZeroVolume;
         }
+        if (accessory.hostsBattery === true) {
+            context.hostsBattery = true;
+        }
         return context;
     }
     /**

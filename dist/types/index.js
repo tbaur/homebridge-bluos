@@ -16,10 +16,11 @@ exports.isSliderService = isSliderService;
  * What an accessory does. Part of its identity, and therefore of its UUID.
  *
  * `volume` is the fake slider, `mute` the mute switch, `volumePreset` a
- * one-level switch, `battery` the state-of-charge sensor for portables, and
- * `reboot` a momentary switch that restarts one player. `rebootAll` is the only
- * kind with no player behind it: it belongs to the platform and restarts every
- * player it can find.
+ * one-level switch, `battery` a standalone charge sensor used only when the
+ * player has no volume or mute tile to host it, and `reboot` a momentary
+ * switch that restarts one player. `rebootAll` is the only kind with no
+ * player behind it: it belongs to the platform and restarts every player it
+ * can find.
  */
 exports.ACCESSORY_KINDS = [
     'volume',

@@ -11,7 +11,7 @@ A checklist of what is built. The plugin aims to cover everything about a BluOS 
 - ✅ Slider exposed as a fan (default) or a lightbulb. Siri commands aimed at lights do not sweep up the fan
 - ✅ Mute switch, with unmute restoring the level the player remembered instead of a guess
 - ✅ Volume preset switches: one exact level per switch, addressable by name with Siri; set On sets the level, set Off is a no-op
-- ✅ Battery sensor (level, charging state, low-battery) for players with a battery pack fitted
+- ✅ Battery (level, charging state, low-battery) on the volume tile, or on mute if there is no slider, for players with a pack fitted. A battery-only player still gets a standalone tile; the Home app will not render that one
 - ✅ Reboot switch per player, momentary so a scene or "turn everything off" cannot reboot the stereo, and still pressable when the player has stopped answering. Reboots the whole box on a multi-zone chassis, which BluOS gives no way to avoid, and warns at startup when that means other configured rooms
 - ✅ Optional "reboot all" switch that reboots every BluOS player on the network, sending once per box instead of once per zone. The info log is a count (`found … device(s), … player(s)`), then `N of N device(s) rebooted`. The debug log names each box before anything is sent. Accessories on a box that was just rebooted stay quiet until it answers again, then take its live state. You choose its name with `options.rebootAllName`, so it can sit in whichever Home app room suits you
 - ✅ Fixed-output players detected from `volume="-1"` and given no slider, with one explanatory log line
@@ -82,7 +82,7 @@ HomeKit has no way to render a library or a queue, and no vocabulary for "play t
 | `volumeSlider` | Fanv2 (default) or Lightbulb, as a 0–100 slider |
 | `mute` | Switch |
 | `volumePresets[]` | Switch, one per level |
-| `battery` | Battery |
+| `battery` | Battery service on the volume tile, or on mute if there is no slider. Standalone Battery accessory only when both are off |
 | `reboot` | Switch, momentary |
 
 ## Accessories per platform

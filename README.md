@@ -13,7 +13,7 @@ Browsing, search, queues and artwork stay in the BluOS app, which HomeKit cannot
 - **Volume slider:** 0–100, the same scale the BluOS app uses. A fan by default, a lightbulb if you prefer
 - **Mute switch:** unmuting restores the level the player remembered, not a guess
 - **Volume presets:** one switch per exact level, addressable by name with Siri
-- **Battery sensor:** level, charging state and low-battery warning, for players with a battery pack
+- **Battery:** level, charging and low-battery, on the volume tile (or mute if there is no slider). A battery-only player still gets its own tile; the Home app will not render that one
 - **Reboot switch:** momentary, so a scene cannot reboot your stereo, and still pressable when the player has stopped answering
 - **Grouping-aware:** a zone leading a BluOS group moves the whole group, exactly as it does in the BluOS app
 - **Multi-zone chassis:** each zone of a NAD CI S2 or CI 580 is its own player, on its own port
@@ -56,7 +56,7 @@ Nothing needs enabling on the player, because the BluOS LAN API is always on. A 
 
 ### 3. Configure
 
-**Homebridge UI** (recommended): open the plugin settings and press **Discover Players**. Every zone that answers is listed with a suggested set of accessories. Tick what you want and save.
+**Homebridge UI** (recommended): open the plugin settings and press **Discover Players**. Every zone that answers is listed with a suggested set of accessories. Tick what you want, then press the Homebridge Save button.
 
 Or in `config.json`:
 

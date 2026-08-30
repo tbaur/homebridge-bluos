@@ -80,9 +80,8 @@
       platformConfig.devices = []
     }
     // Copied rather than aliased: `getPluginConfig` hands back the live objects,
-    // and editing a control should not change the saved configuration until the
-    // user presses Save. `devices` is already rebuilt from scratch on save, so
-    // this closes the same gap for the install-wide settings.
+    // and editing a control must not change them. The page pushes a fresh copy
+    // into Homebridge; the footer Save is what writes that copy to disk.
     platformConfig.options = typeof platformConfig.options === 'object' && platformConfig.options !== null
       ? Object.assign({}, platformConfig.options)
       : {}
@@ -115,9 +114,9 @@
           ? device.volumePresets.filter((preset) => preset && typeof preset.name === 'string')
             .map((preset) => ({ name: preset.name, volume: Number(preset.volume) || 0 }))
           : [],
-        // Kept so that saving preserves settings this page does not model, such
-        // as a per-device sliderService written in the advanced editor. Without
-        // it, opening this page and pressing Save would silently discard them.
+        // Kept so that a later push preserves settings this page does not model,
+        // such as a per-device sliderService written in the advanced editor.
+        // Without it, opening this page and saving would silently discard them.
         saved: device,
       })
     }
@@ -139,6 +138,9 @@
         existing.online = true
         if (existing.fixedVolume) {
           existing.volumeSlider = false
+        }
+        if (!existing.hasBattery) {
+          existing.battery = false
         }
         continue
       }
@@ -178,7 +180,7 @@
         port: player.port,
         volumeSlider: player.volumeSlider === true,
         mute: player.mute === true,
-        battery: player.battery === true,
+        battery: player.battery === true && player.hasBattery === true,
         reboot: player.reboot === true,
       })
       if (player.brand) {
@@ -239,20 +241,31 @@
     }
   }
 
-  async function save() {
-    const devices = toDevices()
-    platformConfig.devices = devices
+  /**
+   * Copy the form into Homebridge's in-memory plugin config.
+   *
+   * The purple footer Save writes that copy to disk. This page does not save on
+   * its own: a second Save is easy to miss, and `savePluginConfig` is the same
+   * action as that footer button.
+   */
+  async function pushConfig() {
+    platformConfig.devices = toDevices()
     applyPlatformOptions()
     try {
       await homebridge.updatePluginConfig([platformConfig])
-      await homebridge.savePluginConfig()
-      homebridge.toast.success(
-        devices.length === 1 ? '1 player saved.' : `${devices.length} players saved.`,
-        'Saved',
-      )
     } catch (error) {
-      homebridge.toast.error(describeError(error), 'Could not save')
+      homebridge.toast.error(describeError(error), 'Could not update the configuration')
     }
+  }
+
+  function changed() {
+    refreshSummary()
+    void pushConfig()
+  }
+
+  function renderChanged() {
+    render()
+    void pushConfig()
   }
 
   // --- Rendering ----------------------------------------------------------
@@ -270,7 +283,7 @@
       name.value = preset.name
       name.addEventListener('input', () => {
         preset.name = name.value
-        refreshSummary()
+        changed()
       })
 
       const volume = el('input', {
@@ -279,12 +292,13 @@
       volume.value = String(preset.volume)
       volume.addEventListener('input', () => {
         preset.volume = Number(volume.value)
+        changed()
       })
 
       const remove = el('button', { class: 'btn btn-outline-danger btn-sm', type: 'button' }, 'Remove')
       remove.addEventListener('click', () => {
         player.presets.splice(index, 1)
-        render()
+        renderChanged()
       })
 
       row.append(name, volume, remove)
@@ -294,20 +308,23 @@
     const add = el('button', { class: 'btn btn-outline-secondary btn-sm', type: 'button' }, 'Add volume preset')
     add.addEventListener('click', () => {
       player.presets.push({ name: '', volume: 30 })
-      render()
+      renderChanged()
     })
     wrapper.append(add)
     return wrapper
   }
 
   function checkbox(label, checked, disabled, onChange) {
-    const wrapper = el('div', { class: 'custom-control custom-switch' })
+    const wrapper = el('div', { class: 'bluos-check' })
     const id = `opt-${Math.random().toString(36).slice(2)}`
-    const input = el('input', { type: 'checkbox', class: 'custom-control-input', id })
+    const input = el('input', { type: 'checkbox', id })
     input.checked = checked
     input.disabled = disabled === true
-    input.addEventListener('change', () => onChange(input.checked))
-    const text = el('label', { class: 'custom-control-label', for: id }, label)
+    input.addEventListener('change', () => {
+      onChange(input.checked)
+      changed()
+    })
+    const text = el('label', { for: id }, label)
     wrapper.append(input, text)
     return wrapper
   }
@@ -321,7 +338,7 @@
     include.setAttribute('aria-label', 'Expose this player in HomeKit')
     include.addEventListener('change', () => {
       player.selected = include.checked
-      render()
+      renderChanged()
     })
 
     const title = el('div', { class: 'bluos-card-title' })
@@ -329,7 +346,7 @@
     nameInput.value = player.name
     nameInput.addEventListener('input', () => {
       player.name = nameInput.value
-      refreshSummary()
+      changed()
     })
     title.append(nameInput)
 
@@ -371,12 +388,14 @@
       (value) => { player.volumeSlider = value },
     ))
     options.append(checkbox('Mute switch', player.mute, false, (value) => { player.mute = value }))
-    options.append(checkbox(
-      player.hasBattery ? 'Battery sensor' : 'Battery sensor (no pack fitted)',
-      player.battery && player.hasBattery,
-      !player.hasBattery,
-      (value) => { player.battery = value },
-    ))
+    if (player.hasBattery) {
+      options.append(checkbox(
+        'Battery (on the volume or mute tile; its own tile only if those are off)',
+        player.battery,
+        false,
+        (value) => { player.battery = value },
+      ))
+    }
     options.append(checkbox(
       'Reboot switch (reboots this player, and any zone sharing its box)',
       player.reboot,
@@ -397,7 +416,7 @@
     for (const device of devices) {
       tiles += device.volumeSlider ? 1 : 0
       tiles += device.mute ? 1 : 0
-      tiles += device.battery ? 1 : 0
+      tiles += device.battery && !device.volumeSlider && !device.mute ? 1 : 0
       tiles += device.reboot ? 1 : 0
       tiles += Array.isArray(device.volumePresets) ? device.volumePresets.length : 0
     }
@@ -407,7 +426,6 @@
     byId('summary').textContent = devices.length === 0 && tiles === 0
       ? 'Nothing selected.'
       : `${devices.length} player(s), ${tiles} HomeKit accessory(s).`
-    byId('save').disabled = false
   }
 
   function render() {
@@ -449,7 +467,7 @@
         }
       }
       mergeDiscovered(found)
-      render()
+      renderChanged()
       if (found.length === 0) {
         homebridge.toast.warning(
           'No players answered. If multicast is filtered on your network, add a player by address.',
@@ -487,7 +505,7 @@
           player.selected = true
         }
       }
-      render()
+      renderChanged()
       homebridge.toast.success(`Found ${found.length} zone(s) at ${host}.`, 'Player added')
     } catch (error) {
       homebridge.toast.error(describeError(error), 'Probe failed')
@@ -498,10 +516,12 @@
 
   byId('discover').addEventListener('click', () => void discover())
   byId('manual-probe').addEventListener('click', () => void probe())
-  byId('save').addEventListener('click', () => void save())
   byId('reboot-all').addEventListener('change', () => {
     refreshRebootAllName()
-    refreshSummary()
+    changed()
+  })
+  byId('reboot-all-name').addEventListener('input', () => {
+    changed()
   })
   byId('toggle-manual').addEventListener('click', () => {
     const panel = byId('manual')
@@ -524,6 +544,7 @@
   loadConfig()
     .then(() => {
       render()
+      return pushConfig()
     })
     .catch((error) => {
       homebridge.toast.error(describeError(error), 'Could not read the configuration')

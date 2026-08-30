@@ -20,6 +20,9 @@
   .bluos-badge { font-size: .7rem; text-transform: uppercase; letter-spacing: .03em; padding: .12rem .4rem; border-radius: .25rem; background: rgba(128, 128, 128, .2); }
   .bluos-badge.warn { background: rgba(255, 193, 7, .28); }
   .bluos-options { display: flex; gap: 1.1rem; flex-wrap: wrap; margin-top: .6rem; }
+  .bluos-check { display: inline-flex; align-items: center; gap: .4rem; margin: 0; }
+  .bluos-check input { margin: 0; }
+  .bluos-check label { margin: 0; }
   .bluos-presets { margin-top: .6rem; }
   .bluos-preset-row { display: flex; gap: .4rem; align-items: center; margin-bottom: .35rem; }
   .bluos-preset-row input[type="text"] { flex: 1 1 8rem; }
@@ -83,7 +86,7 @@
     <div class="bluos-card-title">Whole install</div>
   </div>
   <div class="bluos-options">
-    <label class="mb-0">
+    <label class="bluos-check">
       <input type="checkbox" id="reboot-all" />
       Reboot All switch
     </label>
@@ -96,13 +99,10 @@
     <label for="reboot-all-name" style="font-size: .8rem;">Name in the Home app</label>
     <input type="text" class="form-control form-control-sm" id="reboot-all-name"
            maxlength="64" placeholder="BluOS Reboot All" />
-    <div class="bluos-meta">Name it for the room you want to keep it in.</div>
   </div>
 </div>
 
 <div class="bluos-actions">
-  <button class="btn btn-success" id="save" disabled>Save</button>
-  <span class="spacer"></span>
   <span id="summary" class="text-muted" style="font-size: .85rem;"></span>
 </div>
 

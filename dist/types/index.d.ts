@@ -18,10 +18,11 @@ export interface PluginLogger {
  * What an accessory does. Part of its identity, and therefore of its UUID.
  *
  * `volume` is the fake slider, `mute` the mute switch, `volumePreset` a
- * one-level switch, `battery` the state-of-charge sensor for portables, and
- * `reboot` a momentary switch that restarts one player. `rebootAll` is the only
- * kind with no player behind it: it belongs to the platform and restarts every
- * player it can find.
+ * one-level switch, `battery` a standalone charge sensor used only when the
+ * player has no volume or mute tile to host it, and `reboot` a momentary
+ * switch that restarts one player. `rebootAll` is the only kind with no
+ * player behind it: it belongs to the platform and restarts every player it
+ * can find.
  */
 export declare const ACCESSORY_KINDS: readonly ["volume", "mute", "volumePreset", "battery", "reboot", "rebootAll"];
 /** @see ACCESSORY_KINDS */
@@ -121,6 +122,14 @@ export interface ResolvedAccessory {
     sliderService: SliderService;
     /** Target level, for `volumePreset` only. */
     volume?: number;
+    /**
+     * True when this volume or mute accessory also carries the Battery service.
+     *
+     * HomeKit will not render a Battery accessory on its own. The service sits
+     * on the volume tile when that exists, otherwise on mute. A player that
+     * exposes neither still gets a standalone `battery` accessory.
+     */
+    hostsBattery?: boolean;
 }
 /**
  * What gets persisted in `PlatformAccessory.context`.
@@ -150,6 +159,8 @@ export interface AccessoryContext {
      * authoritative and preferred.
      */
     lastNonZeroVolume?: number;
+    /** True when this volume or mute accessory also carries the Battery service. */
+    hostsBattery?: boolean;
 }
 /**
  * How a player relates to a runtime sync group.

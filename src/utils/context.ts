@@ -68,5 +68,8 @@ export function parseAccessoryContext(accessory: PlatformAccessory): AccessoryCo
   if (Number.isInteger(raw.lastNonZeroVolume)) {
     context.lastNonZeroVolume = raw.lastNonZeroVolume
   }
+  if (raw.hostsBattery === true) {
+    context.hostsBattery = true
+  }
   return context
 }

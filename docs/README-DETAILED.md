@@ -36,7 +36,7 @@ Where HomeKit is genuinely better is the tile, the scene, the automation and the
 
 **Volume preset switches.** One switch per level, for example "Study Evening" at 15. Addressable by name with Siri, and far safer than a slider inside an automation. Setting one On sets the level. Setting it Off does nothing.
 
-**Battery sensor.** Charge level, charging state and low-battery warning, for players with a battery pack fitted (PULSE FLEX with BP100, PULSE M).
+**Battery.** Charge level, charging state and low-battery warning, for players with a battery pack fitted (PULSE FLEX with BP100, PULSE M). The Home app will not render a Battery accessory on its own, so the service sits on the volume tile when that exists, otherwise on mute. A player that exposes battery and nothing else still gets a standalone tile, and Home will keep saying Not Supported for that one.
 
 **Reboot switch.** Reboots the player. It springs back to off and ignores being switched off, so a scene or "turn everything off" cannot reboot your stereo. It stays pressable while a player is showing No Response, which is exactly when you want it.
 

@@ -119,7 +119,7 @@
               "title": "Battery Sensor",
               "type": "boolean",
               "default": false,
-              "description": "State of charge. Only for players with a battery pack fitted, such as a PULSE FLEX with the BP100."
+              "description": "State of charge for a player with a battery pack (PULSE FLEX with the BP100, PULSE M). Appears on the volume tile, or on mute if there is no slider. A battery-only player gets its own tile, which the Home app cannot render."
             },
             "reboot": {
               "title": "Reboot Switch",
