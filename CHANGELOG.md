@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/tbaur/homebridge-bluos/compare/v1.1.2...v1.1.3) (2026-08-30)
+
+
+### Bug Fixes
+
+* host battery on the volume or mute tile ([#29](https://github.com/tbaur/homebridge-bluos/issues/29)) ([beee853](https://github.com/tbaur/homebridge-bluos/commit/beee8532ca39af8c2b97a7c7412b4c5b82c66621))
+
 ## [1.1.2](https://github.com/tbaur/homebridge-bluos/compare/v1.1.1...v1.1.2) (2026-08-30)
 
 
