@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/tbaur/homebridge-bluos/compare/v1.1.1...v1.1.2) (2026-08-30)
+
+
+### Bug Fixes
+
+* do not end the reboot quiet window on a last-gasp poll ([#26](https://github.com/tbaur/homebridge-bluos/issues/26)) ([91651a4](https://github.com/tbaur/homebridge-bluos/commit/91651a4c4b114c8a8e7bfba0cc7c4d6148375b7d))
+
 ## [1.1.1](https://github.com/tbaur/homebridge-bluos/compare/v1.1.0...v1.1.1) (2026-08-30)
 
 
