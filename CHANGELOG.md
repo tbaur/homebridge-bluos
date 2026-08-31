@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5](https://github.com/tbaur/homebridge-bluos/compare/v1.1.4...v1.1.5) (2026-08-31)
+
+
+### Bug Fixes
+
+* keep discover progress in view and leave volume opt-in ([#33](https://github.com/tbaur/homebridge-bluos/issues/33)) ([1dec836](https://github.com/tbaur/homebridge-bluos/commit/1dec8361f2a82d2a1c355f74c4258078bcb945d2))
+
 ## [1.1.4](https://github.com/tbaur/homebridge-bluos/compare/v1.1.3...v1.1.4) (2026-08-31)
 
 
