@@ -213,7 +213,7 @@ describe('the configuration UI backend', () => {
       })
     })
 
-    it('suggests a slider for an adjustable player and none for a fixed one', async () => {
+    it('never suggests a volume slider, which is opt-in', async () => {
       behaviour.players = [player, { ...player, id: 'fixed:11000', fixedVolume: true }]
       const server = load()
 
@@ -221,7 +221,7 @@ describe('the configuration UI backend', () => {
         players: { fixedVolume: boolean; suggested: { volumeSlider: boolean } }[]
       }
 
-      expect(result.players.map((entry) => entry.suggested.volumeSlider)).toEqual([true, false])
+      expect(result.players.map((entry) => entry.suggested.volumeSlider)).toEqual([false, false])
       expect(result.players.map((entry) => entry.fixedVolume)).toEqual([false, true])
     })
 
