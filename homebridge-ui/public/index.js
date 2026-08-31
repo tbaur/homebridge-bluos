@@ -396,12 +396,14 @@
         (value) => { player.battery = value },
       ))
     }
-    options.append(checkbox(
-      'Reboot switch (reboots this player, and any zone sharing its box)',
+    const reboot = checkbox(
+      'Reboot switch (reboots this player, and any zone on the same device)',
       player.reboot,
       false,
       (value) => { player.reboot = value },
-    ))
+    )
+    reboot.className += ' bluos-options-reboot'
+    options.append(reboot)
     card.append(options)
 
     if (player.selected) {

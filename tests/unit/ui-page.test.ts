@@ -255,9 +255,16 @@ describe('the settings page', () => {
 
     expect((await saveOne(page)).reboot).toBe(false)
 
-    tick(page, 'Reboot switch (reboots this player, and any zone sharing its box)')
+    tick(page, 'Reboot switch (reboots this player, and any zone on the same device)')
 
     expect((await saveOne(page)).reboot).toBe(true)
+  })
+
+  it('puts the reboot switch on its own row, with or without a battery checkbox', async () => {
+    const page = await load([configured])
+    const row = page.players().descendants()
+      .find((node) => node.className.includes('bluos-options-reboot'))
+    expect(row).toBeDefined()
   })
 
   it('counts a reboot switch in the accessory total', async () => {
