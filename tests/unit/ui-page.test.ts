@@ -83,6 +83,7 @@ interface Toast {
   success: jest.Mock
   error: jest.Mock
   warning: jest.Mock
+  info: jest.Mock
 }
 
 interface Page {
@@ -119,16 +120,12 @@ async function load(config: unknown[], request?: jest.Mock): Promise<Page> {
   const elements = new Map<string, FakeNode>()
   for (const id of [
     'players', 'summary', 'timeout', 'manual-host', 'manual-port',
-    'manual', 'discover', 'discover-status', 'manual-probe', 'toggle-manual',
-    'toggle-json', 'reboot-all', 'reboot-all-name', 'reboot-all-name-row',
+    'manual', 'discover', 'manual-probe', 'toggle-manual', 'toggle-json',
+    'reboot-all', 'reboot-all-name', 'reboot-all-name-row',
   ]) {
     elements.set(id, new FakeNode('div'))
   }
-  const discoverStatus = elements.get('discover-status')
-  if (discoverStatus !== undefined) {
-    discoverStatus.hidden = true
-  }
-  const toast: Toast = { success: jest.fn(), error: jest.fn(), warning: jest.fn() }
+  const toast: Toast = { success: jest.fn(), error: jest.fn(), warning: jest.fn(), info: jest.fn() }
   const updates: Record<string, unknown>[][] = []
   const homebridge = {
     getPluginConfig: jest.fn().mockResolvedValue(config),
@@ -489,9 +486,9 @@ describe('the settings page', () => {
     expect((await saveOne(page)).battery).toBe(false)
   })
 
-  it('shows progress at Discover rather than a spinner in the middle of the page', async () => {
-    // Homebridge's spinner is centred on the whole settings page. With many
-    // configured players that centre sits below the fold.
+  it('shows Homebridge\'s spinner and a discovering toast', async () => {
+    // The overlay can sit below the fold on a long page. The toast is drawn
+    // on the Config UI chrome, so it stays visible for the start of the scan.
     let finish: (value: { players: unknown[] }) => void = () => undefined
     const request = jest.fn().mockReturnValue(new Promise((resolve) => {
       finish = resolve
@@ -500,20 +497,15 @@ describe('the settings page', () => {
 
     page.byId('discover').fire('click')
     await settle()
-    page.byId('discover').fire('click')
 
-    expect(request).toHaveBeenCalledTimes(1)
-    expect(page.showSpinner).not.toHaveBeenCalled()
-    expect(page.byId('discover').disabled).toBe(true)
-    expect(page.byId('discover-status').hidden).toBe(false)
-    expect(page.byId('discover-status').textContent).toBe('Listening for players…')
+    expect(page.showSpinner).toHaveBeenCalled()
+    expect(page.toast.info).toHaveBeenCalledWith('Listening for players…', 'Discovering')
+    expect(page.hideSpinner).not.toHaveBeenCalled()
 
     finish({ players: [] })
     await settle()
 
-    expect(page.byId('discover').disabled).toBe(false)
-    expect(page.byId('discover-status').hidden).toBe(true)
-    expect(page.hideSpinner).not.toHaveBeenCalled()
+    expect(page.hideSpinner).toHaveBeenCalled()
   })
 
   it('leaves the volume slider off on a newly found player', async () => {
@@ -611,8 +603,7 @@ describe('the settings page', () => {
     await settle()
 
     expect(page.toast.error).toHaveBeenCalledWith('multicast is filtered', 'Discovery failed')
-    expect(page.byId('discover').disabled).toBe(false)
-    expect(page.byId('discover-status').hidden).toBe(true)
+    expect(page.hideSpinner).toHaveBeenCalled()
   })
 
   it('refuses to probe with nothing entered', async () => {
@@ -622,6 +613,7 @@ describe('the settings page', () => {
     page.byId('manual-probe').fire('click')
 
     expect(request).not.toHaveBeenCalled()
+    expect(page.toast.info).not.toHaveBeenCalled()
     expect(page.toast.error).toHaveBeenCalledWith(
       'Enter an IP address or hostname.',
       'Nothing to probe',
@@ -652,6 +644,7 @@ describe('the settings page', () => {
     await settle()
 
     expect(request).toHaveBeenCalledWith('/probe', { host: '192.168.4.13', port: 11_000 })
+    expect(page.toast.info).toHaveBeenCalledWith('Probing 192.168.4.13…', 'Probing')
     const device = await saveOne(page)
     expect(device).toMatchObject({
       id: '90:56:82:0A:00:04:11000',

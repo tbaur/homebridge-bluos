@@ -457,30 +457,12 @@
 
   // --- Actions ------------------------------------------------------------
 
-  let requestInFlight = false
-
-  /**
-   * Show progress next to Discover, which is where the user just pressed.
-   *
-   * Homebridge's spinner is centred on the whole settings page. With a long
-   * list of players that centre sits below the fold, so a user who pressed
-   * Discover would see nothing happen for several seconds.
-   */
-  function setBusy(isBusy, message) {
-    requestInFlight = isBusy
-    byId('discover').disabled = isBusy
-    byId('manual-probe').disabled = isBusy
-    const status = byId('discover-status')
-    status.hidden = !isBusy
-    status.textContent = isBusy ? message : ''
-  }
-
   async function discover() {
-    if (requestInFlight) {
-      return
-    }
     const timeoutSec = Number(byId('timeout').value) || DEFAULT_TIMEOUT_SEC
-    setBusy(true, 'Listening for players…')
+    homebridge.showSpinner()
+    // The overlay can sit in the middle of a long device list. The toast is
+    // drawn on the Config UI chrome, so it stays visible.
+    homebridge.toast.info('Listening for players…', 'Discovering')
     try {
       const response = await homebridge.request('/discover', { timeoutSec })
       const found = Array.isArray(response && response.players) ? response.players : []
@@ -505,14 +487,11 @@
     } catch (error) {
       homebridge.toast.error(describeError(error), 'Discovery failed')
     } finally {
-      setBusy(false)
+      homebridge.hideSpinner()
     }
   }
 
   async function probe() {
-    if (requestInFlight) {
-      return
-    }
     const host = byId('manual-host').value.trim()
     const portValue = byId('manual-port').value.trim()
     if (host.length === 0) {
@@ -523,7 +502,8 @@
     if (portValue.length > 0) {
       payload.port = Number(portValue)
     }
-    setBusy(true, 'Probing…')
+    homebridge.showSpinner()
+    homebridge.toast.info(`Probing ${host}…`, 'Probing')
     try {
       const response = await homebridge.request('/probe', payload)
       const found = Array.isArray(response && response.players) ? response.players : []
@@ -539,7 +519,7 @@
     } catch (error) {
       homebridge.toast.error(describeError(error), 'Probe failed')
     } finally {
-      setBusy(false)
+      homebridge.hideSpinner()
     }
   }
 
