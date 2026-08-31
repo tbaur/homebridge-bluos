@@ -10,39 +10,7 @@
 -->
 <style>
   .bluos-intro { margin-bottom: 1rem; }
-  .bluos-toolbar {
-    display: flex;
-    gap: .5rem;
-    align-items: flex-end;
-    flex-wrap: wrap;
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    margin: 0 0 1rem;
-    padding: .55rem 0;
-    /* Frosted so cards do not show through while this bar stays on screen. */
-    background: rgba(128, 128, 128, .12);
-    backdrop-filter: blur(10px);
-  }
-  .bluos-busy {
-    display: inline-flex;
-    align-items: center;
-    align-self: center;
-    gap: .4rem;
-    font-size: .85rem;
-    white-space: nowrap;
-  }
-  .bluos-busy[hidden] { display: none !important; }
-  .bluos-busy::before {
-    content: '';
-    width: .85rem;
-    height: .85rem;
-    border: 2px solid currentColor;
-    border-right-color: transparent;
-    border-radius: 50%;
-    animation: bluos-spin .7s linear infinite;
-  }
-  @keyframes bluos-spin { to { transform: rotate(360deg); } }
+  .bluos-toolbar { display: flex; gap: .5rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem; }
   .bluos-toolbar .form-group { margin-bottom: 0; }
   .bluos-card { border: 1px solid rgba(128, 128, 128, .3); border-radius: .5rem; padding: .85rem 1rem; margin-bottom: .75rem; }
   .bluos-card.is-selected { border-color: #007bff; box-shadow: 0 0 0 1px rgba(0, 123, 255, .35); }
@@ -78,7 +46,6 @@
 
 <div class="bluos-toolbar">
   <button class="btn btn-primary" id="discover">Discover Players</button>
-  <span id="discover-status" class="bluos-busy text-muted" hidden></span>
   <div class="form-group">
     <label for="timeout" class="mb-0" style="font-size: .8rem;">Listen for</label>
     <select class="form-control form-control-sm" id="timeout">
