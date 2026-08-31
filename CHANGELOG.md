@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.6](https://github.com/tbaur/homebridge-bluos/compare/v1.1.5...v1.1.6) (2026-08-31)
+
+
+### Bug Fixes
+
+* announce discovery with a toast while the spinner runs ([#35](https://github.com/tbaur/homebridge-bluos/issues/35)) ([99582c9](https://github.com/tbaur/homebridge-bluos/commit/99582c92d710f7e5c7aade520faf76a431a0a477))
+
 ## [1.1.5](https://github.com/tbaur/homebridge-bluos/compare/v1.1.4...v1.1.5) (2026-08-31)
 
 
