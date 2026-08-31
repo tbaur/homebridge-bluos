@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/tbaur/homebridge-bluos/compare/v1.1.3...v1.1.4) (2026-08-31)
+
+
+### Bug Fixes
+
+* put the reboot switch on its own line ([#31](https://github.com/tbaur/homebridge-bluos/issues/31)) ([d721851](https://github.com/tbaur/homebridge-bluos/commit/d721851480d1d2e243b90ccfb1105087aed8aaa1))
+
 ## [1.1.3](https://github.com/tbaur/homebridge-bluos/compare/v1.1.2...v1.1.3) (2026-08-30)
 
 
