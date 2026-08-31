@@ -95,6 +95,8 @@ interface Page {
   /** Player names, which the page renders as editable fields rather than text. */
   names: () => string[]
   savePluginConfig: jest.Mock
+  showSpinner: jest.Mock
+  hideSpinner: jest.Mock
 }
 
 /** Lets the page's promise chains run to completion. */
@@ -117,10 +119,14 @@ async function load(config: unknown[], request?: jest.Mock): Promise<Page> {
   const elements = new Map<string, FakeNode>()
   for (const id of [
     'players', 'summary', 'timeout', 'manual-host', 'manual-port',
-    'manual', 'discover', 'manual-probe', 'toggle-manual', 'toggle-json',
-    'reboot-all', 'reboot-all-name', 'reboot-all-name-row',
+    'manual', 'discover', 'discover-status', 'manual-probe', 'toggle-manual',
+    'toggle-json', 'reboot-all', 'reboot-all-name', 'reboot-all-name-row',
   ]) {
     elements.set(id, new FakeNode('div'))
+  }
+  const discoverStatus = elements.get('discover-status')
+  if (discoverStatus !== undefined) {
+    discoverStatus.hidden = true
   }
   const toast: Toast = { success: jest.fn(), error: jest.fn(), warning: jest.fn() }
   const updates: Record<string, unknown>[][] = []
@@ -184,6 +190,8 @@ async function load(config: unknown[], request?: jest.Mock): Promise<Page> {
       .filter((node) => node.attributes.get('maxlength') === '64')
       .map((node) => node.value),
     savePluginConfig: homebridge.savePluginConfig,
+    showSpinner: homebridge.showSpinner,
+    hideSpinner: homebridge.hideSpinner,
   }
 }
 
@@ -481,6 +489,92 @@ describe('the settings page', () => {
     expect((await saveOne(page)).battery).toBe(false)
   })
 
+  it('shows progress at Discover rather than a spinner in the middle of the page', async () => {
+    // Homebridge's spinner is centred on the whole settings page. With many
+    // configured players that centre sits below the fold.
+    let finish: (value: { players: unknown[] }) => void = () => undefined
+    const request = jest.fn().mockReturnValue(new Promise((resolve) => {
+      finish = resolve
+    }))
+    const page = await load([configured], request)
+
+    page.byId('discover').fire('click')
+    await settle()
+    page.byId('discover').fire('click')
+
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(page.showSpinner).not.toHaveBeenCalled()
+    expect(page.byId('discover').disabled).toBe(true)
+    expect(page.byId('discover-status').hidden).toBe(false)
+    expect(page.byId('discover-status').textContent).toBe('Listening for players…')
+
+    finish({ players: [] })
+    await settle()
+
+    expect(page.byId('discover').disabled).toBe(false)
+    expect(page.byId('discover-status').hidden).toBe(true)
+    expect(page.hideSpinner).not.toHaveBeenCalled()
+  })
+
+  it('leaves the volume slider off on a newly found player', async () => {
+    // Same reason as the reboot switch: Discover listing a player is not the
+    // user asking for a HomeKit accessory. A checked slider on every zone
+    // would mint a fan tile for each one the moment they Save.
+    const request = jest.fn().mockResolvedValue({
+      players: [{
+        id: '90:56:82:0A:00:03:11000',
+        name: 'Soundbar',
+        host: '192.168.4.12',
+        port: 11_000,
+        brand: 'Bluesound',
+        model: 'PULSE SOUNDBAR+',
+        firmware: '4.16.6',
+        fixedVolume: false,
+        hasBattery: false,
+        derivedIdentity: false,
+        suggested: { volumeSlider: true, mute: false, battery: false },
+      }],
+    })
+    const page = await load([], request)
+    page.byId('discover').fire('click')
+    await settle()
+
+    const include = page.players().descendants()
+      .find((node) => node.attributes.get('aria-label') === 'Expose this player in HomeKit')
+    if (include === undefined) {
+      throw new Error('no include control')
+    }
+    include.checked = true
+    include.fire('change')
+    const device = await saveOne(page)
+
+    expect(device.volumeSlider).toBe(false)
+    expect(device.mute).toBe(false)
+  })
+
+  it('keeps a configured volume slider after discovery', async () => {
+    const request = jest.fn().mockResolvedValue({
+      players: [{
+        id: configured.devices[0].id,
+        name: 'Zone One',
+        host: '192.168.4.11',
+        port: 11_000,
+        brand: 'NAD',
+        model: 'C658',
+        firmware: '4.16.6',
+        fixedVolume: false,
+        hasBattery: false,
+        derivedIdentity: false,
+        suggested: { volumeSlider: false, mute: false, battery: false },
+      }],
+    })
+    const page = await load([configured], request)
+    page.byId('discover').fire('click')
+    await settle()
+
+    expect((await saveOne(page)).volumeSlider).toBe(true)
+  })
+
   it('flags a configured player that discovery no longer finds', async () => {
     const request = jest.fn().mockResolvedValue({
       players: [{
@@ -517,6 +611,8 @@ describe('the settings page', () => {
     await settle()
 
     expect(page.toast.error).toHaveBeenCalledWith('multicast is filtered', 'Discovery failed')
+    expect(page.byId('discover').disabled).toBe(false)
+    expect(page.byId('discover-status').hidden).toBe(true)
   })
 
   it('refuses to probe with nothing entered', async () => {
@@ -557,7 +653,11 @@ describe('the settings page', () => {
 
     expect(request).toHaveBeenCalledWith('/probe', { host: '192.168.4.13', port: 11_000 })
     const device = await saveOne(page)
-    expect(device).toMatchObject({ id: '90:56:82:0A:00:04:11000', battery: true })
+    expect(device).toMatchObject({
+      id: '90:56:82:0A:00:04:11000',
+      battery: true,
+      volumeSlider: false,
+    })
   })
 
   it('offers no slider for a fixed-output player', async () => {

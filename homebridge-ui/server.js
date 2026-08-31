@@ -155,11 +155,14 @@ class BluOSUiServer extends HomebridgePluginUiServer {
   }
 
   /**
-   * Shape a discovered player for the page, including sensible defaults.
+   * Shape a discovered player for the page, including opt-in accessory defaults.
    *
-   * A player that reports a fixed output level gets no slider suggested, because
-   * writing a level to it does nothing. A player with no usable MAC is given a
-   * generated identity here, once, so that it stays stable from then on.
+   * Volume, mute and reboot stay off until the user asks for them: Discover
+   * listing a zone is not a request for a HomeKit accessory. A player with a
+   * battery pack is offered that sensor, because it is a reading rather than a
+   * control. A player that reports a fixed output cannot take a slider at all,
+   * which the page learns from `fixedVolume`. A player with no usable MAC is
+   * given a generated identity here, once, so that it stays stable from then on.
    */
   describe(player) {
     const api = this.loadApi()
@@ -176,7 +179,7 @@ class BluOSUiServer extends HomebridgePluginUiServer {
       hasBattery: player.hasBattery === true,
       derivedIdentity: !(player.mac && player.mac.length > 0),
       suggested: {
-        volumeSlider: player.fixedVolume !== true,
+        volumeSlider: false,
         mute: false,
         battery: player.hasBattery === true,
         // Never suggested. Restarting a player interrupts whatever it is doing,
