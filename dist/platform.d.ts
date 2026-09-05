@@ -136,6 +136,10 @@ export declare class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHo
      *
      * Driven by context rather than configuration so that the same path works when
      * the platform is disabled and there is no valid configuration to consult.
+     *
+     * The validated context becomes the accessory's own, so the handler and the
+     * Homebridge cache hold one object. Anything a handler remembers is then in
+     * the object `persistContext` serialises. See {@link bindAccessoryContext}.
      */
     private attachHandler;
     private startPollers;

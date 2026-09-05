@@ -257,15 +257,21 @@ export class DevicePoller {
     }
   }
 
+  /**
+   * Read this zone once, long-polling when there is a token to poll with.
+   *
+   * Both reads are abortable, not just the long poll. A plain read is the path an
+   * unreachable player takes — a failure clears the etag — and it can sit for the
+   * whole status timeout, which a shutdown would otherwise wait out per player.
+   */
   private async readOnce(): Promise<PlayerObservation> {
     const etag = this.etag
-    if (etag === undefined) {
-      return this.options.client.readSyncStatus(this.currentEndpoint)
-    }
     const abort = new AbortController()
     this.abort = abort
     try {
-      return await this.options.client.pollSyncStatus(this.currentEndpoint, etag, abort.signal)
+      return etag === undefined
+        ? await this.options.client.readSyncStatus(this.currentEndpoint, abort.signal)
+        : await this.options.client.pollSyncStatus(this.currentEndpoint, etag, abort.signal)
     } catch (error) {
       throw abort.signal.aborted ? new PollInterrupted() : error
     } finally {

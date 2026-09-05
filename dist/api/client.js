@@ -58,13 +58,21 @@ class BluOSClient {
         this.now = options.now ?? Date.now;
         this.sleep = options.sleep ?? timing_1.sleep;
     }
-    /** Read `/SyncStatus` once, without long-polling. */
-    async readSyncStatus(endpoint) {
+    /**
+     * Read `/SyncStatus` once, without long-polling.
+     *
+     * Takes a signal for the same reason the long poll does. This read is bounded
+     * by {@link STATUS_TIMEOUT_MS} rather than by a poll window, but a shutdown
+     * still has to be able to drop it: an unreachable player holds it for the full
+     * timeout, and a shutdown waits for every poller.
+     */
+    async readSyncStatus(endpoint, signal) {
         const body = await this.get({
             endpoint,
             resource: 'SyncStatus',
             query: {},
             totalTimeoutMs: settings_1.STATUS_TIMEOUT_MS,
+            signal,
         });
         return (0, sync_status_1.parseSyncStatus)(body, (0, identity_1.formatEndpoint)(endpoint.host, endpoint.port));
     }
