@@ -1,6 +1,6 @@
 # homebridge-bluos
 
-[![Tests](https://github.com/tbaur/homebridge-bluos/actions/workflows/test.yml/badge.svg)](https://github.com/tbaur/homebridge-bluos/actions/workflows/test.yml) [![npm version](https://img.shields.io/npm/v/homebridge-bluos?style=flat-square)](https://www.npmjs.com/package/homebridge-bluos) [![npm downloads](https://img.shields.io/npm/dt/homebridge-bluos?label=downloads&style=flat-square)](https://www.npmjs.com/package/homebridge-bluos) [![Node.js](https://img.shields.io/badge/node-%3E%3D22-green)](https://nodejs.org) [![verified-by-homebridge](https://img.shields.io/badge/homebridge-verified-blueviolet?color=%23491F59&style=flat)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins) [![Homebridge](https://img.shields.io/badge/homebridge-%3E%3D2.0.0-purple)](https://homebridge.io) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Tests](https://github.com/tbaur/homebridge-bluos/actions/workflows/test.yml/badge.svg)](https://github.com/tbaur/homebridge-bluos/actions/workflows/test.yml) [![npm version](https://img.shields.io/npm/v/homebridge-bluos?style=flat-square)](https://www.npmjs.com/package/homebridge-bluos) [![npm downloads](https://img.shields.io/npm/dt/homebridge-bluos?label=downloads&style=flat-square)](https://www.npmjs.com/package/homebridge-bluos) [![Node.js](https://img.shields.io/badge/node-22%20%7C%7C%2024%20%7C%7C%2026-green)](https://nodejs.org) [![verified-by-homebridge](https://img.shields.io/badge/homebridge-verified-blueviolet?color=%23491F59&style=flat)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins) [![Homebridge](https://img.shields.io/badge/homebridge-2.x-purple)](https://homebridge.io) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 **BluOS players in Apple HomeKit, over your LAN.** No cloud, no accounts, no polling loops hammering your speakers. Verified against NAD and Bluesound hardware. Other BluOS brands (DALI, Monitor Audio, Roksan) run the same firmware and are expected to work, but are untested here.
 
@@ -133,7 +133,7 @@ The plugin talks only to the addresses in your configuration, on your LAN. There
 
 ## Requirements
 
-- Homebridge 2.0+
+- Homebridge 2.x
 - Node.js 22, 24 or 26, matching what Homebridge 2.x itself supports
 - One or more BluOS players reachable on the same network
 

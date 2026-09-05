@@ -46,7 +46,7 @@ A checklist of what is built. The plugin aims to cover everything about a BluOS 
 - ✅ A cached accessory that the plugin cannot drive reports No Response and says what to do about it. It never shows a stale value forever
 - ✅ Custom Homebridge UI settings page, plus a plain `config.schema.json` form
 - ✅ Homebridge v2.0+ support
-- ✅ Node.js 20+ support
+- ✅ Node.js 22, 24 and 26 support
 
 ## Not built yet
 
