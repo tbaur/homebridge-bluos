@@ -44,7 +44,7 @@
     "brace-expansion": "^5.0.9"
   },
   "dependencies": {
-    "@homebridge/plugin-ui-utils": "2.2.5",
+    "@homebridge/plugin-ui-utils": "2.2.6",
     "multicast-dns": "7.2.5"
   },
   "devDependencies": {
