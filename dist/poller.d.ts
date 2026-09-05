@@ -90,6 +90,13 @@ export declare class DevicePoller {
     /** Cancel the request in flight and wake any backoff sleep. */
     private interrupt;
     private run;
+    /**
+     * Read this zone once, long-polling when there is a token to poll with.
+     *
+     * Both reads are abortable, not just the long poll. A plain read is the path an
+     * unreachable player takes — a failure clears the etag — and it can sit for the
+     * whole status timeout, which a shutdown would otherwise wait out per player.
+     */
     private readOnce;
     private handleFailure;
     /**

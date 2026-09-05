@@ -62,12 +62,12 @@ import type {
   ResolvedDevice,
 } from './types'
 import {
+  bindAccessoryContext,
   describeError,
   describeErrorStack,
   ensureAccessorySerialNumber,
   forLog,
   newAccessorySerialNumber,
-  parseAccessoryContext,
   RebootGrace,
   resolveAccessories,
   resolveDiscoveryTimeoutSec,
@@ -450,6 +450,9 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
       device,
       serialNumber: newAccessorySerialNumber(),
       adoptedLegacyUuid: false,
+      // Nothing to carry over: this path is taken only when no cached accessory
+      // answered to this identity.
+      previous: undefined,
     })
     this.attachHandler(platformAccessory)
     this.active.set(uuid, platformAccessory)
@@ -481,6 +484,11 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
       device,
       serialNumber,
       adoptedLegacyUuid: adopted || alreadyAdopted,
+      // Read off the accessory being adopted rather than looked up by the UUID
+      // this identity produces now. An adopted accessory is cached under its old
+      // UUID, so that lookup misses on exactly the path this branch exists for,
+      // and the level the user last set would be dropped by the migration.
+      previous: existing.context as Partial<AccessoryContext>,
     })
     if (existing.displayName !== accessory.name) {
       this.log.info(
@@ -498,11 +506,10 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
     device: ResolvedDevice | undefined
     serialNumber: string
     adoptedLegacyUuid: boolean
+    /** Context of the cached accessory this one replaces, when there is one. */
+    previous: Partial<AccessoryContext> | undefined
   }): AccessoryContext {
-    const { accessory, device, serialNumber, adoptedLegacyUuid } = input
-    const previous = this.restored.get(this.uuidFor(accessory))?.context as
-      | Partial<AccessoryContext>
-      | undefined
+    const { accessory, device, serialNumber, adoptedLegacyUuid, previous } = input
     // The platform's own switch has no device, and so no address: its host and
     // port are placeholders that nothing reads, because it resolves its targets
     // when it is pressed rather than holding one endpoint.
@@ -534,11 +541,15 @@ export class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHost {
    *
    * Driven by context rather than configuration so that the same path works when
    * the platform is disabled and there is no valid configuration to consult.
+   *
+   * The validated context becomes the accessory's own, so the handler and the
+   * Homebridge cache hold one object. Anything a handler remembers is then in
+   * the object `persistContext` serialises. See {@link bindAccessoryContext}.
    */
   private attachHandler(accessory: PlatformAccessory): void {
     let context: AccessoryContext
     try {
-      context = parseAccessoryContext(accessory)
+      context = bindAccessoryContext(accessory)
     } catch (error) {
       this.log.warn(
         `${forLog(accessory.displayName)} cannot be driven: ${describeError(error)}. `

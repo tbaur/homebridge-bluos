@@ -83,8 +83,15 @@ export declare class BluOSClient {
     /** Tail of the write queue for each chassis host. */
     private readonly chassisWriteQueue;
     constructor(options: BluOSClientOptions);
-    /** Read `/SyncStatus` once, without long-polling. */
-    readSyncStatus(endpoint: Endpoint): Promise<PlayerObservation>;
+    /**
+     * Read `/SyncStatus` once, without long-polling.
+     *
+     * Takes a signal for the same reason the long poll does. This read is bounded
+     * by {@link STATUS_TIMEOUT_MS} rather than by a poll window, but a shutdown
+     * still has to be able to drop it: an unreachable player holds it for the full
+     * timeout, and a shutdown waits for every poller.
+     */
+    readSyncStatus(endpoint: Endpoint, signal?: AbortSignal): Promise<PlayerObservation>;
     /**
      * Long-poll `/SyncStatus`, returning when the player's state changes or the
      * poll window elapses.

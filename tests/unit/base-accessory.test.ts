@@ -115,6 +115,19 @@ describe('shared accessory behaviour', () => {
       expect(information.lastValue('Model')).toBe('PULSE M')
     })
 
+    it('writes a corrected identity where Homebridge will persist it', () => {
+      const test = harness({ context: { brand: 'BluOS', model: 'BluOS Player' } })
+      const accessory = new VolumeAccessory(test)
+
+      accessory.applyObservation(observation({ brand: 'Bluesound', modelName: 'PULSE M' }), 'startup')
+
+      // The accessory's own context, because that is the object the cache is
+      // written from. A correction stored anywhere else is one the tile has to
+      // make again on every launch.
+      expect(test.persistedContext.brand).toBe('Bluesound')
+      expect(test.persistedContext.model).toBe('PULSE M')
+    })
+
     it('falls back to the model code when the player gives no friendly name', () => {
       const test = harness({ context: { model: 'BluOS Player' } })
       const accessory = new VolumeAccessory(test)

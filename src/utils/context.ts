@@ -73,3 +73,23 @@ export function parseAccessoryContext(accessory: PlatformAccessory): AccessoryCo
   }
   return context
 }
+
+/**
+ * Validate a restored accessory's context and make it the accessory's own.
+ *
+ * What a handler is given has to be the object Homebridge serialises, because
+ * handlers remember things in it: a slider's last non-zero level, a brand the
+ * player reported that configuration got wrong. {@link parseAccessoryContext}
+ * returns a new object by design, so a handler driven by that alone would write
+ * those values to a detached copy — thrown away at the next restart, after
+ * paying a full accessory-cache rewrite per volume step to save nothing.
+ *
+ * Kept separate from {@link parseAccessoryContext} so validating a context stays
+ * free of side effects for a caller that only wants to know whether it can be
+ * read.
+ */
+export function bindAccessoryContext(accessory: PlatformAccessory): AccessoryContext {
+  const context = parseAccessoryContext(accessory)
+  accessory.context = context
+  return context
+}

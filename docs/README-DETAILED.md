@@ -275,7 +275,7 @@ Responses are parsed by a size-, depth- and element-capped XML reader instead of
 
 - **Strict TypeScript:** `strict`, plus `noUncheckedIndexedAccess` and type-aware lint
 - **Tested:** a behavioural Jest suite over 95% of statements, including XML fixtures recorded from real hardware (NAD C658, CI S2, Bluesound P430, portable player) and the settings page that writes your configuration
-- **CI:** build, lint (warnings are failures), type-check and test on Node 20/22/24, a job against the oldest supported Homebridge, a committed-`dist` drift check, a dependency audit and OSV scanning
+- **CI:** build, lint (warnings are failures), type-check and test on Node 22/24/26, a job against the oldest supported Homebridge, a committed-`dist` drift check, a dependency audit and OSV scanning
 - **No analytics:** no tracking, no cloud, no accounts
 
 ## More

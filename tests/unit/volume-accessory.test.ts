@@ -13,6 +13,7 @@
 
 import { VolumeAccessory } from '../../src/devices/volume-accessory'
 import { SLIDER_COALESCE_MS } from '../../src/settings'
+import type { AccessoryContext } from '../../src/types'
 import { harness, observation, SERVICE_COMMUNICATION_FAILURE } from '../helpers/hap'
 
 /** Long enough for the coalescing window to close. */
@@ -352,8 +353,33 @@ describe('VolumeAccessory', () => {
 
       accessory.applyObservation(observation({ volume: 47 }), 'poll')
 
-      expect(test.context.lastNonZeroVolume).toBe(47)
+      // Asserted on the accessory's own context, because that is what
+      // updatePlatformAccessories serialises: a level remembered anywhere else
+      // is thrown away at the next restart, and the cache rewrite it cost saved
+      // nothing.
+      expect(test.persistedContext.lastNonZeroVolume).toBe(47)
       expect(test.persisted).toBe(1)
+    })
+
+    it('offers the remembered level again after a restart', async () => {
+      const before = harness()
+      new VolumeAccessory(before).applyObservation(observation({ volume: 47 }), 'poll')
+
+      // Round-tripped, because that is what the accessory cache does with a
+      // context between launches. A level remembered in anything but the
+      // accessory's own context does not make the trip.
+      const after = harness({
+        context: JSON.parse(JSON.stringify(before.persistedContext)) as Partial<AccessoryContext>,
+        observation: observation({ volume: 0 }),
+      })
+      new VolumeAccessory(after)
+
+      await after.service('Fanv2').getCharacteristic('Active').write(1)
+      await afterCoalescing()
+
+      // The user's own last level, rather than DEFAULT_RESTORE_VOLUME.
+      expect(after.client.setVolume)
+        .toHaveBeenCalledWith(expect.anything(), 47, { tellSlaves: false })
     })
 
     it('persists the remembered level only when it changes', () => {

@@ -161,6 +161,15 @@ function cached(uuid: string, displayName: string, context: Partial<AccessoryCon
   return accessory as unknown as PlatformAccessory
 }
 
+/** The same accessory as the next launch gets it, through the on-disk cache. */
+function afterRestart(accessory: PlatformAccessory): PlatformAccessory {
+  return cached(
+    accessory.UUID,
+    accessory.displayName,
+    JSON.parse(JSON.stringify(accessory.context)) as Partial<AccessoryContext>,
+  )
+}
+
 describe('BluOSPlatform', () => {
   // Timers are held, never advanced: the pollers are staggered behind a timer,
   // so nothing here ever reaches for the network.
@@ -295,6 +304,58 @@ describe('BluOSPlatform', () => {
       expect((test.updated.flat()[0]?.context as AccessoryContext).lastNonZeroVolume).toBe(44)
     })
 
+    it('writes a level the player reported into the cache, and reads it back', () => {
+      // The whole loop, because either half looks right on its own: the handler
+      // has to write into the accessory's own context, that object has to be the
+      // one handed to updatePlatformAccessories, and the next launch has to find
+      // the level still in it.
+      const first = build({ devices: [{ ...device, mute: false }] })
+      const accessory = cached(uuidOf('90:56:82:0A:00:02:11000:volume'), 'Zone One', {
+        kind: 'volume',
+        deviceId: device.id,
+        serialNumber: 'kept',
+        sliderService: 'fan',
+      })
+      first.platform.configureAccessory(accessory)
+      first.launch()
+
+      first.platform['publish'](device.id, observation({ volume: 47 }), 'poll')
+
+      const written = first.updated.flat().filter((entry) => entry.UUID === accessory.UUID)
+      expect((written[written.length - 1]?.context as AccessoryContext).lastNonZeroVolume).toBe(47)
+
+      const second = build({ devices: [{ ...device, mute: false }] })
+      second.platform.configureAccessory(afterRestart(accessory))
+      second.launch()
+
+      expect((second.updated.flat()[0]?.context as AccessoryContext).lastNonZeroVolume).toBe(47)
+    })
+
+    it('writes identity the player corrected into the cache too', () => {
+      // Brand and model come off the wire and are only ever written by a handler,
+      // so they reach the cache by the same route as the remembered level.
+      const test = build({ devices: [{ ...device, mute: false }] })
+      const accessory = cached(uuidOf('90:56:82:0A:00:02:11000:volume'), 'Zone One', {
+        kind: 'volume',
+        deviceId: device.id,
+        serialNumber: 'kept',
+        sliderService: 'fan',
+      })
+      test.platform.configureAccessory(accessory)
+      test.launch()
+
+      test.platform['publish'](
+        device.id,
+        observation({ volume: 47, brand: 'Bluesound', modelName: 'PULSE M' }),
+        'poll',
+      )
+
+      const written = test.updated.flat().filter((entry) => entry.UUID === accessory.UUID)
+      const context = written[written.length - 1]?.context as AccessoryContext
+      expect(context.brand).toBe('Bluesound')
+      expect(context.model).toBe('PULSE M')
+    })
+
     it('adopts an accessory whose UUID scheme changed, rather than replacing it', () => {
       // The safety net: a replacement would drop the accessory out of every
       // scene and automation it belongs to.
@@ -312,6 +373,25 @@ describe('BluOSPlatform', () => {
       expect(test.unregistered).toEqual([])
       expect(test.log.calls.some((line) => line.includes('adopting cached accessory'))).toBe(true)
       expect((test.updated.flat()[0]?.context as AccessoryContext).adoptedLegacyUuid).toBe(true)
+    })
+
+    it('carries the remembered level through an adoption, not only a restart', () => {
+      // An adopted accessory is cached under its old UUID, so a previous context
+      // looked up by the UUID its identity produces now would never be found —
+      // and the migration meant to preserve the user's work would quietly drop
+      // the level their slider goes back to.
+      const test = build({ devices: [{ ...device, mute: false }] })
+      test.platform.configureAccessory(cached('uuid:legacy-scheme', 'Zone One', {
+        kind: 'volume',
+        deviceId: device.id,
+        serialNumber: 'kept',
+        sliderService: 'fan',
+        lastNonZeroVolume: 44,
+      }))
+
+      test.launch()
+
+      expect((test.updated.flat()[0]?.context as AccessoryContext).lastNonZeroVolume).toBe(44)
     })
 
     it('mentions an adoption once, not on every launch afterwards', () => {

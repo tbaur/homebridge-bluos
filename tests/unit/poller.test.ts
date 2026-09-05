@@ -14,6 +14,7 @@ import type { BluOSClient, Endpoint } from '../../src/api/client'
 import { DevicePoller } from '../../src/poller'
 import { POLL_BACKOFF_BASE_MS, POLL_BACKOFF_MAX_MS } from '../../src/settings'
 import type { PlayerObservation, RefreshReason } from '../../src/types'
+import { raceTimeout, TIMED_OUT } from '../../src/utils/timing'
 import { fakeLogger, observation } from '../helpers/hap'
 
 /** A promise whose resolution the test controls. */
@@ -94,9 +95,9 @@ function setup(
   }
 
   const client = {
-    readSyncStatus: jest.fn(async (endpoint: Endpoint) => {
+    readSyncStatus: jest.fn(async (endpoint: Endpoint, signal?: AbortSignal) => {
       reads.push(endpoint)
-      return next()
+      return next(signal)
     }),
     pollSyncStatus: jest.fn(async (endpoint: Endpoint, etag: string, signal?: AbortSignal) => {
       polls.push({ endpoint, etag })
@@ -524,6 +525,24 @@ describe('DevicePoller', () => {
     const test = setup([async () => observation()])
 
     await expect(test.stop()).resolves.toBeUndefined()
+  })
+
+  it('stops without waiting out a plain status read', async () => {
+    // The read an unreachable player is on, because a failure clears the etag,
+    // and it holds for the whole status timeout against a box that is not
+    // answering. The platform awaits every poller at shutdown, so a read nothing
+    // can cancel is six seconds of shutdown per silent player.
+    const test = setup([])
+    test.poller.start()
+    await flush()
+    expect(test.reads).toHaveLength(1)
+    expect(test.polls).toEqual([])
+
+    // Deliberately not `test.stop`, which releases held requests by hand: the
+    // poller's own abort has to be what ends this one.
+    const outcome = await raceTimeout(test.poller.stop(), 500)
+
+    expect(outcome).not.toBe(TIMED_OUT)
   })
 
   it('stops promptly while an address lookup is still running', async () => {

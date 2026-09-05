@@ -349,6 +349,9 @@ class BluOSPlatform {
             device,
             serialNumber: (0, utils_1.newAccessorySerialNumber)(),
             adoptedLegacyUuid: false,
+            // Nothing to carry over: this path is taken only when no cached accessory
+            // answered to this identity.
+            previous: undefined,
         });
         this.attachHandler(platformAccessory);
         this.active.set(uuid, platformAccessory);
@@ -372,6 +375,11 @@ class BluOSPlatform {
             device,
             serialNumber,
             adoptedLegacyUuid: adopted || alreadyAdopted,
+            // Read off the accessory being adopted rather than looked up by the UUID
+            // this identity produces now. An adopted accessory is cached under its old
+            // UUID, so that lookup misses on exactly the path this branch exists for,
+            // and the level the user last set would be dropped by the migration.
+            previous: existing.context,
         });
         if (existing.displayName !== accessory.name) {
             this.log.info(`${(0, utils_1.forLog)(existing.displayName)} is now named ${(0, utils_1.forLog)(accessory.name)}`);
@@ -382,8 +390,7 @@ class BluOSPlatform {
         this.api.updatePlatformAccessories([existing]);
     }
     buildContext(input) {
-        const { accessory, device, serialNumber, adoptedLegacyUuid } = input;
-        const previous = this.restored.get(this.uuidFor(accessory))?.context;
+        const { accessory, device, serialNumber, adoptedLegacyUuid, previous } = input;
         // The platform's own switch has no device, and so no address: its host and
         // port are placeholders that nothing reads, because it resolves its targets
         // when it is pressed rather than holding one endpoint.
@@ -414,11 +421,15 @@ class BluOSPlatform {
      *
      * Driven by context rather than configuration so that the same path works when
      * the platform is disabled and there is no valid configuration to consult.
+     *
+     * The validated context becomes the accessory's own, so the handler and the
+     * Homebridge cache hold one object. Anything a handler remembers is then in
+     * the object `persistContext` serialises. See {@link bindAccessoryContext}.
      */
     attachHandler(accessory) {
         let context;
         try {
-            context = (0, utils_1.parseAccessoryContext)(accessory);
+            context = (0, utils_1.bindAccessoryContext)(accessory);
         }
         catch (error) {
             this.log.warn(`${(0, utils_1.forLog)(accessory.displayName)} cannot be driven: ${(0, utils_1.describeError)(error)}. `

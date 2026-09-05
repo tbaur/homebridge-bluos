@@ -25,9 +25,10 @@ updates:
       # ts-jest still import. Language-identical to 6; stay until 7.1.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
-      # @types/node must track engines.node (>=20), or the compiler accepts an
-      # API that does not exist on the oldest runtime a user may be on. Raise
-      # both together, deliberately, rather than letting a bump raise one.
+      # @types/node must track engines.node (^22 || ^24 || ^26), or the compiler
+      # accepts an API that does not exist on the oldest runtime a user may be
+      # on. Raise both together, deliberately, rather than letting a bump raise
+      # one.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
     groups:

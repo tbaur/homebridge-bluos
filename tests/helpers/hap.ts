@@ -19,6 +19,7 @@ import type { BluOSClient, Endpoint, RebootResult, WriteScope } from '../../src/
 import type { VolumeResult } from '../../src/api/sync-status'
 import type { AccessoryHost, RebootTarget } from '../../src/devices/host'
 import type { AccessoryContext, PlayerObservation, PluginLogger } from '../../src/types'
+import { bindAccessoryContext } from '../../src/utils/context'
 
 /** A recorded characteristic. */
 export class FakeCharacteristic {
@@ -235,7 +236,16 @@ export function fakeLogger(): PluginLogger & { calls: string[] } {
 export interface Harness {
   host: AccessoryHost
   accessory: PlatformAccessory
+  /** The context the handler was built with, as the platform hands it over. */
   context: AccessoryContext
+  /**
+   * The context Homebridge would serialise, which is the accessory's own.
+   *
+   * A separate accessor because the two are only the same object if the platform
+   * makes them so, and anything a handler remembers in a context the cache does
+   * not hold is thrown away at the next restart.
+   */
+  persistedContext: AccessoryContext
   log: PluginLogger & { calls: string[] }
   client: {
     setVolume: jest.Mock<Promise<VolumeResult>, [Endpoint, number, WriteScope?]>
@@ -280,11 +290,16 @@ export function harness(overrides: {
   /** Other configured players behind this one's address. */
   sharingAddress?: readonly string[]
 } = {}): Harness {
-  const context: AccessoryContext = { ...defaultContext, ...overrides.context }
   const accessory = new FakeAccessory(
     overrides.displayName ?? 'Zone One',
-    context as unknown as Record<string, unknown>,
+    { ...defaultContext, ...overrides.context } as unknown as Record<string, unknown>,
   )
+  // Bound through the platform's own wiring rather than by handing one object to
+  // both sides. What a handler holds is a validated context, which is a new
+  // object; whether that is also the object Homebridge serialises is the
+  // platform's business, and a harness that shared one object would report a
+  // handler's writes as persisted however the platform behaved.
+  const context = bindAccessoryContext(accessory as unknown as PlatformAccessory)
   const log = fakeLogger()
   const adopted: VolumeResult[] = []
   const persistedAccessories: (PlatformAccessory | undefined)[] = []
@@ -335,6 +350,9 @@ export function harness(overrides: {
     host,
     accessory: accessory as unknown as PlatformAccessory,
     context,
+    get persistedContext() {
+      return accessory.context as unknown as AccessoryContext
+    },
     log,
     client,
     rebootTargets,
