@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.0](https://github.com/tbaur/homebridge-bluos/compare/v1.1.6...v2.0.0) (2026-09-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* requires Homebridge 2.0 or newer and Node 22, 24 or 26. Homebridge 1.x and Node 20 are no longer supported.
+
+### Features
+
+* require Homebridge 2 and Node 22+, and fix cached-context persistence ([#39](https://github.com/tbaur/homebridge-bluos/issues/39)) ([72fdbf8](https://github.com/tbaur/homebridge-bluos/commit/72fdbf80de22183ca79b5da4c3cdda575e4ef8d1))
+
 ## [1.1.6](https://github.com/tbaur/homebridge-bluos/compare/v1.1.5...v1.1.6) (2026-08-31)
 
 
