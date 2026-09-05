@@ -818,7 +818,11 @@ describe('BluOSPlatform', () => {
       const test = build({ devices: [device] })
       test.launch()
       test.platform.expectReboot(device.host)
-      jest.advanceTimersByTime(REBOOT_GRACE_MS)
+      // The window is a wall-clock comparison, so move the clock rather than
+      // advancing timers. Advancing them fires the poller stagger and starts a
+      // real poll loop, which breaks this file's "timers are held" invariant
+      // and leaves a handle open that stops Jest exiting.
+      jest.setSystemTime(Date.now() + REBOOT_GRACE_MS + 1)
 
       test.platform['reportUnavailable'](device.id, timeout())
 
