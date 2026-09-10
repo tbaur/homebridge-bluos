@@ -82,4 +82,13 @@ export interface AccessoryHost {
      * poll the source of truth for HomeKit instead of the pre-reboot reading.
      */
     expectReboot(host: string): void;
+    /**
+     * True while this address is still expected to be down from a reboot we sent.
+     *
+     * Asked before a reboot goes out, not only when one fails. A box part-way
+     * through a restart has no web server on port 80, so a second request cannot
+     * reach it and its failure says nothing about whether the first one worked.
+     * Sending anyway is what turns one press into a page of `could not reboot`.
+     */
+    isRebooting(host: string): boolean;
 }

@@ -287,6 +287,8 @@ export function harness(overrides: {
   muteResult?: VolumeResult
   rebootResult?: RebootResult
   rebootTargets?: readonly RebootTarget[]
+  /** Addresses already inside a reboot grace window when the test starts. */
+  rebooting?: readonly string[]
   /** Other configured players behind this one's address. */
   sharingAddress?: readonly string[]
 } = {}): Harness {
@@ -344,6 +346,11 @@ export function harness(overrides: {
     expectReboot: (host: string) => {
       expectedReboots.push(host)
     },
+    // Seeded addresses stand for a grace window opened before the test began.
+    // Addresses rebooted during the test join them, which is what the platform
+    // does and what lets a test observe a second press being declined.
+    isRebooting: (host: string) => (overrides.rebooting ?? []).includes(host)
+      || expectedReboots.includes(host),
   }
 
   return {

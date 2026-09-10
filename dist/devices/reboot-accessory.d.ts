@@ -8,13 +8,20 @@
  *
  * Two departures from how every other accessory here behaves, both deliberate.
  *
- * It is momentary, never stateful. `On` always reads false, turning it on fires
- * the reboot and the tile springs back, and turning it off does nothing. There is
- * no such thing as an un-reboot, so an off has nothing to mean. This is also what
- * makes the switch safe to leave in a house full of scenes: "turn everything off"
- * and a scene that sets switches off both write false, and false does nothing
- * here. A stateful reboot switch would restart the stereo every time someone said
- * goodnight.
+ * It is momentary, never stateful. Turning it on fires the reboot, the tile
+ * springs back once the request has been sent, and turning it off does nothing.
+ * There is no such thing as an un-reboot, so an off has nothing to mean. This is
+ * also what makes the switch safe to leave in a house full of scenes: "turn
+ * everything off" and a scene that sets switches off both write false, and false
+ * does nothing here. A stateful reboot switch would restart the stereo every time
+ * someone said goodnight.
+ *
+ * `On` reads true only while a press this switch started is still being sent.
+ * That is a fact about this switch rather than a reading off the player, so it
+ * does not break the rule against inventing state. It matters because a HomeKit
+ * write must answer inside the write budget while the reboot itself can take
+ * longer: a tile that springs back before anything is logged looks like a press
+ * that did nothing, and gets pressed again.
  *
  * It stays pressable when the player is unreachable, which breaks the plugin's
  * "unknown is No Response" rule. That rule exists so automations cannot fire
@@ -36,9 +43,19 @@ import { BaseAccessory, type AccessoryInit } from './base-accessory';
 export declare class RebootAccessory extends BaseAccessory {
     private readonly service;
     private resetTimer;
+    /** True from a press until the tile springs back. @see writeOn */
+    private rebooting;
     constructor(init: AccessoryInit);
     private writeOn;
-    /** Spring the tile back to off, the way a real button returns. */
+    /** Send the reboot, unless this box is already on its way down. */
+    private sendReboot;
+    /**
+     * Spring the tile back to off, the way a real button returns.
+     *
+     * Clearing {@link rebooting} here rather than when the work finishes keeps the
+     * reported value and the pushed value in step: HomeKit is told off at the same
+     * moment a read would start answering off.
+     */
     private scheduleReset;
     /**
      * Nothing to apply.

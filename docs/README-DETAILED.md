@@ -38,7 +38,9 @@ Where HomeKit is genuinely better is the tile, the scene, the automation and the
 
 **Battery.** Charge level, charging state and low-battery warning, for players with a battery pack fitted (PULSE FLEX with BP100, PULSE M). The Home app will not render a Battery accessory on its own, so the service sits on the volume tile when that exists, otherwise on mute. A player that exposes battery and nothing else still gets a standalone tile, and Home will keep saying Not Supported for that one.
 
-**Reboot switch.** Reboots the player. It springs back to off and ignores being switched off, so a scene or "turn everything off" cannot reboot your stereo. It stays pressable while a player is showing No Response, which is exactly when you want it.
+**Reboot switch.** Reboots the player. It ignores being switched off, so a scene or "turn everything off" cannot reboot your stereo. It stays pressable while a player is showing No Response, which is exactly when you want it.
+
+The tile stays on while the request is being sent, then springs back. A press that arrives while a restart is still under way is ignored, and a player already restarting is not sent a second request: nothing serves the reboot page while a box boots, so a repeat could only fail and would be reported as a reboot that did not work.
 
 On a multi-zone chassis it reboots both zones. BluOS serves reboot on the box's own web server, not on a zone's control port, so "Study Reboot" on a CI S2 also takes down the other room. There is no way to avoid this. At startup the plugin warns, naming the other affected rooms.
 
@@ -51,6 +53,8 @@ On a multi-zone chassis it reboots both zones. BluOS serves reboot on the box's 
 **Reboot all.** Off by default. One switch that reboots **every BluOS player it can find on the network**, not only the ones listed in your configuration. It sweeps with mDNS and adds your configured players, so it still works where multicast is filtered.
 
 The info log is a count (`found 2 device(s), 3 player(s)`), then `2 of 2 device(s) rebooted`. The debug log names every box and the players on it before a request goes out. One press sends one reboot per box, so a multi-zone chassis reboots once and takes all of its zones with it. A box that cannot be reached is a warning (`could not reboot`), and the rest still go.
+
+One press is one wave. The sweep takes longer than HomeKit will wait for a write, so the tile stays on until the wave finishes rather than springing back while it runs, and a press that lands mid-wave is ignored. Boxes already restarting are skipped with a count (`skipping 1 device(s) already restarting`), and the total counts only what was actually sent.
 
 Name it with `options.rebootAllName`. It is the one accessory with no room of its own, so you choose where it lives in the Home app.
 
@@ -203,6 +207,14 @@ The middle line is debug. A box that did not take the request is a warning:
 [BluOS] Downstairs Reboot: 1 of 2 device(s) rebooted
 ```
 
+A box that is already restarting is skipped rather than warned about, and the total counts only what was sent:
+
+```text
+[BluOS] Downstairs Reboot: found 2 device(s), 3 player(s)
+[BluOS] Downstairs Reboot: skipping 1 device(s) already restarting: 192.168.4.11
+[BluOS] Downstairs Reboot: 1 of 1 device(s) rebooted
+```
+
 A per-player reboot switch on a shared chassis, at startup:
 
 ```text
@@ -255,11 +267,12 @@ Ordered by how well HomeKit expresses the thing, not by how easy it is to build.
 6. **A zone on a multi-zone chassis is missing.** Check the port. Zone two is 11010, not 11000
 7. **The volume moved but the slider did not, for a second.** A change made on the player takes one long-poll round trip to arrive. A change made from HomeKit is immediate
 8. **One zone's slider moved several rooms.** That zone is currently leading a BluOS group, so it carries its followers, the same as its slider in the BluOS app. Ungroup in the BluOS app and it goes back to moving alone
-9. **The reboot switch turns itself off.** This is by design. It is a button, not a state: it fires when switched on, then springs back. Switching it off does nothing, which is what stops a scene or "turn everything off" from rebooting your stereo
+9. **The reboot switch turns itself off.** This is by design. It is a button, not a state: it stays on while the request is being sent, then springs back. Switching it off does nothing, which is what stops a scene or "turn everything off" from rebooting your stereo
 10. **Reboot All rebooted a player you did not configure.** Also by design, and the reason it is off by default. It sweeps the network instead of reading `devices[]`. The info log is a count (`found … device(s), … player(s)`); the debug log lists every player by name and address
 11. **A reboot switch rebooted the room next door.** Expect this on a multi-zone chassis such as a CI S2. BluOS serves `/reboot` on the box's own web server, not on a zone's control port, so there is no way to reboot one zone of a shared box. At startup the plugin warns, naming the other rooms
-12. **100 is louder than you ever want.** Set the limit on the player, in the BluOS app's settings for it. The wording varies by model: a volume limit on Bluesound players, a maximum volume on NAD amplifiers. The plugin deliberately has no ceiling of its own, so a limit set on the player is enforced by the hardware for every controller. No HomeKit automation or misheard Siri phrase can exceed it, and a second limit here could only disagree with the first
-13. Restart Homebridge after editing `config.json` by hand
+12. **A reboot press seems to be ignored.** Check for `a restart is already under way` or `is already restarting`. A restart already in progress is not repeated: nothing serves `/reboot` while a box boots, so a second request could only fail and would be logged as a reboot that did not work. The window is 90 seconds, after which the switch sends again
+13. **100 is louder than you ever want.** Set the limit on the player, in the BluOS app's settings for it. The wording varies by model: a volume limit on Bluesound players, a maximum volume on NAD amplifiers. The plugin deliberately has no ceiling of its own, so a limit set on the player is enforced by the hardware for every controller. No HomeKit automation or misheard Siri phrase can exceed it, and a second limit here could only disagree with the first
+14. Restart Homebridge after editing `config.json` by hand
 
 ### Why is my volume a fan?
 

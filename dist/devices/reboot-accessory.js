@@ -9,13 +9,20 @@
  *
  * Two departures from how every other accessory here behaves, both deliberate.
  *
- * It is momentary, never stateful. `On` always reads false, turning it on fires
- * the reboot and the tile springs back, and turning it off does nothing. There is
- * no such thing as an un-reboot, so an off has nothing to mean. This is also what
- * makes the switch safe to leave in a house full of scenes: "turn everything off"
- * and a scene that sets switches off both write false, and false does nothing
- * here. A stateful reboot switch would restart the stereo every time someone said
- * goodnight.
+ * It is momentary, never stateful. Turning it on fires the reboot, the tile
+ * springs back once the request has been sent, and turning it off does nothing.
+ * There is no such thing as an un-reboot, so an off has nothing to mean. This is
+ * also what makes the switch safe to leave in a house full of scenes: "turn
+ * everything off" and a scene that sets switches off both write false, and false
+ * does nothing here. A stateful reboot switch would restart the stereo every time
+ * someone said goodnight.
+ *
+ * `On` reads true only while a press this switch started is still being sent.
+ * That is a fact about this switch rather than a reading off the player, so it
+ * does not break the rule against inventing state. It matters because a HomeKit
+ * write must answer inside the write budget while the reboot itself can take
+ * longer: a tile that springs back before anything is logged looks like a press
+ * that did nothing, and gets pressed again.
  *
  * It stays pressable when the player is unreachable, which breaks the plugin's
  * "unknown is No Response" rule. That rule exists so automations cannot fire
@@ -40,6 +47,8 @@ const base_accessory_1 = require("./base-accessory");
 class RebootAccessory extends base_accessory_1.BaseAccessory {
     service;
     resetTimer;
+    /** True from a press until the tile springs back. @see writeOn */
+    rebooting = false;
     constructor(init) {
         super(init);
         const { Characteristic: Char, Service: HapService } = this.host.hap;
@@ -47,7 +56,7 @@ class RebootAccessory extends base_accessory_1.BaseAccessory {
         this.service.setCharacteristic(Char.Name, this.displayName);
         this.service
             .getCharacteristic(Char.On)
-            .onGet(() => false)
+            .onGet(() => this.rebooting)
             .onSet(async (value) => this.writeOn(value));
         const shared = this.host.playersSharingAddress(this.deviceId);
         if (shared.length > 0) {
@@ -59,35 +68,62 @@ class RebootAccessory extends base_accessory_1.BaseAccessory {
         if (value !== true) {
             return;
         }
-        try {
-            await this.completeWithinBudget('reboot', async () => {
-                const endpoint = this.host.endpointFor(this.deviceId);
-                if (endpoint === undefined) {
-                    throw new Error('player is no longer configured');
-                }
-                // The host only: reboot lives on port 80, not on the zone's control port.
-                const result = await this.host.client.reboot(endpoint.host);
-                // The box is going down. Tell the platform so the other accessories
-                // stay quiet, and so the next poll is what HomeKit shows.
-                this.host.expectReboot(endpoint.host);
-                // Never a group operation. Grouping decides where a *volume* change
-                // reaches; a reboot restarts a box and has no notion of followers.
-                this.logAction(result.acknowledged ? 'REBOOT' : 'REBOOT (sent; the player stopped answering, as expected)', { tellSlaves: false });
-            });
+        if (this.rebooting) {
+            // A press that arrives while one is still being sent is a duplicate, not a
+            // second instruction: the box can only be restarted once.
+            this.host.log.info(`${(0, utils_1.forLog)(this.displayName)}: a restart is already under way; ignoring this press`);
+            return;
         }
-        finally {
-            // In `finally` because a failed reboot must not leave the tile stuck on.
-            // The write already surfaced its own error to HomeKit and to the log.
-            this.scheduleReset();
-        }
+        this.rebooting = true;
+        await this.completeWithinBudget('reboot', async () => {
+            try {
+                await this.sendReboot();
+            }
+            finally {
+                // Inside the work rather than around the budget, so the tile springs back
+                // when the reboot is actually done instead of when HomeKit stopped
+                // waiting for it. A failed reboot resets too: a tile left on would
+                // suggest something is still happening.
+                this.scheduleReset();
+            }
+        });
     }
-    /** Spring the tile back to off, the way a real button returns. */
+    /** Send the reboot, unless this box is already on its way down. */
+    async sendReboot() {
+        const endpoint = this.host.endpointFor(this.deviceId);
+        if (endpoint === undefined) {
+            throw new Error('player is no longer configured');
+        }
+        if (this.host.isRebooting(endpoint.host)) {
+            // Not an error, and deliberately not a second request. Port 80 is down
+            // while the box boots, so this would fail and be reported as a reboot that
+            // did not work, when in fact one is in progress.
+            this.host.log.info(`${(0, utils_1.forLog)(this.displayName)}: ${endpoint.host} is already restarting; nothing sent`);
+            return;
+        }
+        // The host only: reboot lives on port 80, not on the zone's control port.
+        const result = await this.host.client.reboot(endpoint.host);
+        // The box is going down. Tell the platform so the other accessories
+        // stay quiet, and so the next poll is what HomeKit shows.
+        this.host.expectReboot(endpoint.host);
+        // Never a group operation. Grouping decides where a *volume* change
+        // reaches; a reboot restarts a box and has no notion of followers.
+        this.logAction(result.acknowledged ? 'REBOOT' : 'REBOOT (sent; the player stopped answering, as expected)', { tellSlaves: false });
+    }
+    /**
+     * Spring the tile back to off, the way a real button returns.
+     *
+     * Clearing {@link rebooting} here rather than when the work finishes keeps the
+     * reported value and the pushed value in step: HomeKit is told off at the same
+     * moment a read would start answering off.
+     */
     scheduleReset() {
         if (this.resetTimer !== undefined) {
             clearTimeout(this.resetTimer);
         }
         this.resetTimer = setTimeout(() => {
             this.resetTimer = undefined;
+            this.rebooting = false;
             this.service.updateCharacteristic(this.host.hap.Characteristic.On, false);
         }, settings_1.MOMENTARY_RESET_MS);
         // Nothing is waiting on this, so it must not hold Homebridge open at shutdown.
