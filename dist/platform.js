@@ -215,6 +215,15 @@ class BluOSPlatform {
             }
         }
     }
+    /**
+     * True while a reboot of this address is still expected to be in progress.
+     *
+     * The same window the pollers use to keep quiet, read by the reboot switches so
+     * they decline to send a second request to a box already on its way down.
+     */
+    isRebooting(host) {
+        return this.rebootGrace.isExpected(host);
+    }
     /** Current address of a player, preferring the poller when it has one. */
     hostOf(deviceId) {
         return this.endpointFor(deviceId)?.host

@@ -13,6 +13,7 @@
  */
 
 import { RebootAccessory } from '../../src/devices/reboot-accessory'
+import { HOMEKIT_WRITE_BUDGET_MS, MOMENTARY_RESET_MS } from '../../src/settings'
 import { harness, observation } from '../helpers/hap'
 
 describe('RebootAccessory', () => {
@@ -71,7 +72,9 @@ describe('RebootAccessory', () => {
     expect(test.client.reboot).not.toHaveBeenCalled()
   })
 
-  it('always reads off, so no automation can see it as a state', () => {
+  it('reads off when idle, whatever the player reports', () => {
+    // No automation may see this as a state: what the player is doing has no
+    // bearing on whether a button is pressed.
     const test = harness({ context: { kind: 'reboot' } })
     const accessory = new RebootAccessory(test)
 
@@ -80,6 +83,56 @@ describe('RebootAccessory', () => {
     accessory.applyObservation(observation(), 'poll')
 
     expect(test.service('Switch').getCharacteristic('On').read()).toBe(false)
+  })
+
+  it('reads on while a press is still being sent, then springs back', async () => {
+    // A HomeKit write has to answer inside the write budget, and a reboot request
+    // is allowed to take longer than that. A tile that sprang back at the budget
+    // looked like a press that had done nothing, and got pressed again.
+    const test = harness({ context: { kind: 'reboot' }, displayName: 'Zone One Reboot' })
+    let release = (): void => {}
+    test.client.reboot.mockImplementation(async () => {
+      await new Promise<void>((resolve) => { release = resolve })
+      return { acknowledged: true }
+    })
+    new RebootAccessory(test)
+    const on = test.service('Switch').getCharacteristic('On')
+
+    const press = on.write(true)
+    await jest.advanceTimersByTimeAsync(HOMEKIT_WRITE_BUDGET_MS + 1)
+    await press
+
+    expect(on.read()).toBe(true)
+
+    await on.write(true)
+
+    expect(test.client.reboot).toHaveBeenCalledTimes(1)
+    expect(test.log.calls.some((line) => line.startsWith('info')
+      && line.includes('Zone One Reboot: a restart is already under way'))).toBe(true)
+
+    release()
+    await jest.advanceTimersByTimeAsync(MOMENTARY_RESET_MS + 1)
+
+    expect(on.read()).toBe(false)
+    expect(test.service('Switch').lastValue('On')).toBe(false)
+  })
+
+  it('does not send a second reboot to a box that is already restarting', async () => {
+    // Port 80 is down while the box boots, so this could only fail and then be
+    // reported as a reboot that did not work.
+    const test = harness({
+      context: { kind: 'reboot' },
+      displayName: 'Zone One Reboot',
+      rebooting: ['192.168.4.11'],
+    })
+    new RebootAccessory(test)
+
+    await test.service('Switch').getCharacteristic('On').write(true)
+
+    expect(test.client.reboot).not.toHaveBeenCalled()
+    expect(test.log.calls).toContain(
+      'info Zone One Reboot: 192.168.4.11 is already restarting; nothing sent',
+    )
   })
 
   it('springs back to off after a press', async () => {

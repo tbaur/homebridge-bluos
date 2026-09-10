@@ -814,6 +814,31 @@ describe('BluOSPlatform', () => {
         && line.includes('is not responding'))).toBe(true)
     })
 
+    it('reports the address as restarting, so a switch declines to send again', () => {
+      // The reboot switches read this before sending. A box part-way through a
+      // restart has no web server on port 80, so a second request could only
+      // fail and be reported as a reboot that did not work.
+      const test = build({ devices: [device] })
+      test.launch()
+
+      expect(test.platform.isRebooting(device.host)).toBe(false)
+
+      test.platform.expectReboot(device.host)
+
+      expect(test.platform.isRebooting(device.host)).toBe(true)
+      expect(test.platform.isRebooting('192.168.4.99')).toBe(false)
+    })
+
+    it('stops reporting the address as restarting once the window has ended', () => {
+      const test = build({ devices: [device] })
+      test.launch()
+      test.platform.expectReboot(device.host)
+
+      jest.setSystemTime(Date.now() + REBOOT_GRACE_MS + 1)
+
+      expect(test.platform.isRebooting(device.host)).toBe(false)
+    })
+
     it('warns the usual way once the grace window has ended', () => {
       const test = build({ devices: [device] })
       test.launch()

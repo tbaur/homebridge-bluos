@@ -26,6 +26,14 @@
  * See RebootAccessory for why this is momentary and why it stays pressable when
  * players are unreachable; the same reasoning applies, more so here, since a
  * fleet-wide restart is most useful when several players have stopped answering.
+ *
+ * One press is one wave, and a wave outlasts the HomeKit write budget by a good
+ * margin: the sweep alone runs for the discovery window before a single request
+ * goes out. So the tile is held on for as long as the wave runs, and a press that
+ * arrives while one is running is ignored rather than queued. Without both, a
+ * press looks like it did nothing, gets repeated, and each repeat sweeps a fleet
+ * that is now half way through restarting — which finds fewer boxes every time
+ * and reports the ones it does find as failures.
  */
 import type { PlayerObservation, RefreshReason } from '../types';
 import { BaseAccessory, type AccessoryInit } from './base-accessory';
@@ -33,8 +41,12 @@ import { BaseAccessory, type AccessoryInit } from './base-accessory';
 export declare class RebootAllAccessory extends BaseAccessory {
     private readonly service;
     private resetTimer;
+    /** True from a press until the tile springs back. @see writeOn */
+    private rebooting;
     constructor(init: AccessoryInit);
     private writeOn;
+    /** Sweep for targets, then restart every one that is not already going down. */
+    private runWave;
     /** Count at info, name every box at debug, before any request goes out. */
     private announce;
     /**
@@ -45,9 +57,30 @@ export declare class RebootAllAccessory extends BaseAccessory {
      * single dead address delay every box behind it by a full timeout.
      * `allSettled` because one failure must not abandon the rest — a fleet-wide
      * restart that stopped at the first missing player would be worse than useless.
+     *
+     * Addresses already inside their reboot grace window are left alone. Nothing
+     * serves port 80 while a box boots, so a request there could only fail, and
+     * reporting that as `could not reboot` states the opposite of what is true.
      */
     private rebootAll;
-    /** Spring the tile back to off, the way a real button returns. */
+    /** Split targets into those still to restart and those already restarting. */
+    private partition;
+    /**
+     * Log one failed reboot, and say whether it counts against the total.
+     *
+     * A box that entered its grace window after the check above — because the
+     * per-player switch was pressed, or an earlier wave reached it — is going down
+     * already. A refused or unanswered port 80 is what that looks like, so it is a
+     * debug line rather than a warning about a reboot that did not work.
+     */
+    private isExcusedFailure;
+    /**
+     * Spring the tile back to off, the way a real button returns.
+     *
+     * Clearing {@link rebooting} here rather than when the wave finishes keeps the
+     * reported value and the pushed value in step: HomeKit is told off at the same
+     * moment a read would start answering off.
+     */
     private scheduleReset;
     /**
      * Never marked unreachable.

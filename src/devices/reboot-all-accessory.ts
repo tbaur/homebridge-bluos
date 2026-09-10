@@ -26,6 +26,14 @@
  * See RebootAccessory for why this is momentary and why it stays pressable when
  * players are unreachable; the same reasoning applies, more so here, since a
  * fleet-wide restart is most useful when several players have stopped answering.
+ *
+ * One press is one wave, and a wave outlasts the HomeKit write budget by a good
+ * margin: the sweep alone runs for the discovery window before a single request
+ * goes out. So the tile is held on for as long as the wave runs, and a press that
+ * arrives while one is running is ignored rather than queued. Without both, a
+ * press looks like it did nothing, gets repeated, and each repeat sweeps a fleet
+ * that is now half way through restarting — which finds fewer boxes every time
+ * and reports the ones it does find as failures.
  */
 
 import type { CharacteristicValue, Service } from 'homebridge'
@@ -42,6 +50,9 @@ export class RebootAllAccessory extends BaseAccessory {
 
   private resetTimer: ReturnType<typeof setTimeout> | undefined
 
+  /** True from a press until the tile springs back. @see writeOn */
+  private rebooting = false
+
   constructor(init: AccessoryInit) {
     super(init)
     const { Characteristic: Char, Service: HapService } = this.host.hap
@@ -49,7 +60,7 @@ export class RebootAllAccessory extends BaseAccessory {
     this.service.setCharacteristic(Char.Name, this.displayName)
     this.service
       .getCharacteristic(Char.On)
-      .onGet(() => false)
+      .onGet(() => this.rebooting)
       .onSet(async (value) => this.writeOn(value))
   }
 
@@ -57,22 +68,37 @@ export class RebootAllAccessory extends BaseAccessory {
     if (value !== true) {
       return
     }
-    try {
-      await this.completeWithinBudget('reboot all', async () => {
-        const targets = await this.host.rebootTargets()
-        if (targets.length === 0) {
-          this.host.log.warn(
-            `${forLog(this.displayName)}: found nothing to reboot. `
-            + 'Multicast may be filtered on this network and no players are configured',
-          )
-          return
-        }
-        this.announce(targets)
-        await this.rebootAll(targets)
-      })
-    } finally {
-      this.scheduleReset()
+    if (this.rebooting) {
+      this.host.log.info(
+        `${forLog(this.displayName)}: a restart is already under way; ignoring this press`,
+      )
+      return
     }
+    this.rebooting = true
+    await this.completeWithinBudget('reboot all', async () => {
+      try {
+        await this.runWave()
+      } finally {
+        // Inside the work rather than around the budget. The budget expires long
+        // before the sweep finishes, so resetting there springs the tile back
+        // before the first line of the log is written.
+        this.scheduleReset()
+      }
+    })
+  }
+
+  /** Sweep for targets, then restart every one that is not already going down. */
+  private async runWave(): Promise<void> {
+    const targets = await this.host.rebootTargets()
+    if (targets.length === 0) {
+      this.host.log.warn(
+        `${forLog(this.displayName)}: found nothing to reboot. `
+        + 'Multicast may be filtered on this network and no players are configured',
+      )
+      return
+    }
+    this.announce(targets)
+    await this.rebootAll(targets)
   }
 
   /** Count at info, name every box at debug, before any request goes out. */
@@ -98,15 +124,33 @@ export class RebootAllAccessory extends BaseAccessory {
    * single dead address delay every box behind it by a full timeout.
    * `allSettled` because one failure must not abandon the rest — a fleet-wide
    * restart that stopped at the first missing player would be worse than useless.
+   *
+   * Addresses already inside their reboot grace window are left alone. Nothing
+   * serves port 80 while a box boots, so a request there could only fail, and
+   * reporting that as `could not reboot` states the opposite of what is true.
    */
   private async rebootAll(targets: readonly RebootTarget[]): Promise<void> {
+    const { pending, restarting } = this.partition(targets)
+    if (restarting.length > 0) {
+      this.host.log.info(
+        `${forLog(this.displayName)}: skipping ${restarting.length} device(s) already `
+        + `restarting: ${restarting.map((target) => target.host).join(', ')}`,
+      )
+    }
+    if (pending.length === 0) {
+      this.host.log.info(
+        `${forLog(this.displayName)}: every device found is already restarting; nothing sent`,
+      )
+      return
+    }
+
     const outcomes = await Promise.allSettled(
-      targets.map(async (target) => this.host.client.reboot(target.host)),
+      pending.map(async (target) => this.host.client.reboot(target.host)),
     )
 
     let failed = 0
     outcomes.forEach((outcome, index) => {
-      const target = targets[index]
+      const target = pending[index]
       if (target === undefined) {
         return
       }
@@ -114,26 +158,70 @@ export class RebootAllAccessory extends BaseAccessory {
         this.host.expectReboot(target.host)
         return
       }
-      failed += 1
-      this.host.log.warn(
-        `${forLog(this.displayName)}: could not reboot ${target.host} `
-        + `(${target.names.map(forLog).join(', ')}): ${describeError(outcome.reason)}`,
-      )
+      if (!this.isExcusedFailure(target, outcome.reason)) {
+        failed += 1
+      }
     })
 
-    const rebooted = targets.length - failed
+    const rebooted = pending.length - failed
     this.host.log.info(
-      `${forLog(this.displayName)}: ${rebooted} of ${targets.length} device(s) rebooted`,
+      `${forLog(this.displayName)}: ${rebooted} of ${pending.length} device(s) rebooted`,
     )
   }
 
-  /** Spring the tile back to off, the way a real button returns. */
+  /** Split targets into those still to restart and those already restarting. */
+  private partition(targets: readonly RebootTarget[]): {
+    pending: RebootTarget[]
+    restarting: RebootTarget[]
+  } {
+    const pending: RebootTarget[] = []
+    const restarting: RebootTarget[] = []
+    for (const target of targets) {
+      if (this.host.isRebooting(target.host)) {
+        restarting.push(target)
+      } else {
+        pending.push(target)
+      }
+    }
+    return { pending, restarting }
+  }
+
+  /**
+   * Log one failed reboot, and say whether it counts against the total.
+   *
+   * A box that entered its grace window after the check above — because the
+   * per-player switch was pressed, or an earlier wave reached it — is going down
+   * already. A refused or unanswered port 80 is what that looks like, so it is a
+   * debug line rather than a warning about a reboot that did not work.
+   */
+  private isExcusedFailure(target: RebootTarget, reason: unknown): boolean {
+    const named = `${target.host} (${target.names.map(forLog).join(', ')})`
+    const detail = describeError(reason)
+    if (this.host.isRebooting(target.host)) {
+      this.host.log.debug(
+        `${forLog(this.displayName)}: ${named} is already restarting, so it did not `
+        + `answer: ${detail}`,
+      )
+      return true
+    }
+    this.host.log.warn(`${forLog(this.displayName)}: could not reboot ${named}: ${detail}`)
+    return false
+  }
+
+  /**
+   * Spring the tile back to off, the way a real button returns.
+   *
+   * Clearing {@link rebooting} here rather than when the wave finishes keeps the
+   * reported value and the pushed value in step: HomeKit is told off at the same
+   * moment a read would start answering off.
+   */
   private scheduleReset(): void {
     if (this.resetTimer !== undefined) {
       clearTimeout(this.resetTimer)
     }
     this.resetTimer = setTimeout(() => {
       this.resetTimer = undefined
+      this.rebooting = false
       this.service.updateCharacteristic(this.host.hap.Characteristic.On, false)
     }, MOMENTARY_RESET_MS)
     this.resetTimer.unref?.()

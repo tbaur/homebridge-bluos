@@ -178,12 +178,13 @@ export const DEFAULT_RESTORE_VOLUME = 20
 export const SLIDER_COALESCE_MS = 150
 
 /**
- * How long a momentary switch stays on before it springs back.
+ * How long a momentary switch stays on after its work has finished.
  *
- * A reboot switch has no state to report: the player is either restarting or it
- * is not, and neither is "on". Long enough that the Home app renders the press
- * so the user sees the tap registered, short enough that the tile is not left
- * looking like a thing that is still happening.
+ * A floor on how long a press is visible, not the whole duration: the tile is
+ * held on while the reboot is actually being sent, which outlasts
+ * {@link HOMEKIT_WRITE_BUDGET_MS} and can outlast this. It matters for a press
+ * that finishes almost at once, such as a sweep that found nothing, where
+ * springing back immediately would look like a tap that never registered.
  */
 export const MOMENTARY_RESET_MS = 1_000
 

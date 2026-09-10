@@ -108,6 +108,13 @@ export declare class BluOSPlatform implements DynamicPlatformPlugin, AccessoryHo
      * the grace window do not mark accessories unreachable.
      */
     expectReboot(host: string): void;
+    /**
+     * True while a reboot of this address is still expected to be in progress.
+     *
+     * The same window the pollers use to keep quiet, read by the reboot switches so
+     * they decline to send a second request to a box already on its way down.
+     */
+    isRebooting(host: string): boolean;
     /** Current address of a player, preferring the poller when it has one. */
     private hostOf;
     private start;
