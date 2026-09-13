@@ -25,6 +25,8 @@ exports.isIpv4 = isIpv4;
 exports.isValidHost = isValidHost;
 exports.isNonPrivateIpv4 = isNonPrivateIpv4;
 exports.isProbeableHost = isProbeableHost;
+exports.isDiscoveryHost = isDiscoveryHost;
+exports.isLoopbackIpv4 = isLoopbackIpv4;
 exports.resolveDiscoveryTimeoutSec = resolveDiscoveryTimeoutSec;
 exports.resolveSliderService = resolveSliderService;
 exports.validateConfig = validateConfig;
@@ -168,6 +170,28 @@ function isProbeableHost(value) {
         return true;
     }
     return PROBE_LOCAL_SUFFIXES.some((suffix) => lower.endsWith(suffix) && lower.length > suffix.length);
+}
+/**
+ * True for an address discovery may dial after an unsolicited mDNS advertisement.
+ *
+ * Narrower than {@link isProbeableHost}. The settings-page probe is an
+ * administrator asking this host to open a connection, so loopback is allowed
+ * there. An advertisement on the LAN is not a request, and a packet that names
+ * 127.0.0.1 would make Homebridge talk to itself.
+ */
+function isDiscoveryHost(value) {
+    if (!isProbeableHost(value)) {
+        return false;
+    }
+    return !isLoopbackIpv4(value.trim());
+}
+/** True for IPv4 loopback (first octet 127). `isProbeableHost` treats this as local; discovery does not. */
+function isLoopbackIpv4(value) {
+    if (!isIpv4(value)) {
+        return false;
+    }
+    const [firstOctet = 0] = value.split('.').map(Number);
+    return firstOctet === 127;
 }
 /** Clamp the discovery window into the supported range. */
 function resolveDiscoveryTimeoutSec(value, warnings) {

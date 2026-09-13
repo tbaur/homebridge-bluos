@@ -42,7 +42,7 @@ A checklist of what is built. The plugin aims to cover everything about a BluOS 
 - ✅ An unusable configuration disables the platform and keeps every accessory registered. Nothing is deleted
 - ✅ Per-device validation: one bad entry is skipped with a warning instead of stopping the rest
 - ✅ Size-, depth-, element- and attribute-capped XML parsing, sanitised log output, and a length cap on any identity a player reports for itself
-- ✅ Bounded discovery: the records kept from a browse, the candidates verified from it and the verifications in flight are all capped
+- ✅ Bounded discovery: the records kept from a browse, the candidates verified from it and the verifications in flight are all capped. Public IPv4 and loopback advertisements are not verified
 - ✅ Clean shutdown: poll loops, backoff delays and mDNS browses are cancelled, not left to run out
 - ✅ A cached accessory that the plugin cannot drive reports No Response and says what to do about it. It never shows a stale value forever
 - ✅ Custom Homebridge UI settings page, plus a plain `config.schema.json` form

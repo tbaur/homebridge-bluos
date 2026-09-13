@@ -85,6 +85,17 @@ export declare function isNonPrivateIpv4(value: string): boolean;
  * hostnames are accepted.
  */
 export declare function isProbeableHost(value: unknown): value is string;
+/**
+ * True for an address discovery may dial after an unsolicited mDNS advertisement.
+ *
+ * Narrower than {@link isProbeableHost}. The settings-page probe is an
+ * administrator asking this host to open a connection, so loopback is allowed
+ * there. An advertisement on the LAN is not a request, and a packet that names
+ * 127.0.0.1 would make Homebridge talk to itself.
+ */
+export declare function isDiscoveryHost(value: unknown): value is string;
+/** True for IPv4 loopback (first octet 127). `isProbeableHost` treats this as local; discovery does not. */
+export declare function isLoopbackIpv4(value: string): boolean;
 /** Clamp the discovery window into the supported range. */
 export declare function resolveDiscoveryTimeoutSec(value: unknown, warnings?: string[]): number;
 /**

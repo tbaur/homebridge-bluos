@@ -259,7 +259,7 @@ mDNS, browsing two service types:
 | `_musc._tcp.local` | Primary players |
 | `_musp._tcp.local` | Secondary zones of a multi-zone chassis (spec appendix §13.1, LSDP class `0x0003`) |
 
-A zone is usable once its `SRV` record (for the port) and an IPv4 address are both known; the address comes from an `A` record when one is offered and otherwise from the responder's own source address. `TXT` records carry `model`, `version`, `mac` and `zs`, but secondary zones **omit `mac`**. That is why identity is always confirmed by reading `/SyncStatus`, and never trusted from the advertisement alone.
+A zone is usable once its `SRV` record (for the port) and a **local** IPv4 address are both known; the address comes from an `A` record when one is offered and otherwise from the responder's own source address. Public IPv4 and loopback advertisements are ignored, so a packet on the LAN cannot steer verify at Homebridge itself or at an off-network host. `TXT` records carry `model`, `version`, `mac` and `zs`, but secondary zones **omit `mac`**. That is why identity is always confirmed by reading `/SyncStatus`, and never trusted from the advertisement alone.
 
 **LSDP** (UDP 11430) is documented as an alternative and was tried first: it failed repeatedly against this fleet, while mDNS answered reliably. mDNS is therefore the only discovery path, with manual address entry as the fallback for networks that filter multicast.
 

@@ -35,6 +35,7 @@ const node_os_1 = __importDefault(require("node:os"));
 const settings_1 = require("../settings");
 const errors_1 = require("../utils/errors");
 const timing_1 = require("../utils/timing");
+const validators_1 = require("../utils/validators");
 const identity_1 = require("./identity");
 /** Re-query schedule, in milliseconds, to survive dropped multicast packets. */
 const QUERY_SCHEDULE_MS = [0, 400, 1_200];
@@ -202,10 +203,12 @@ class BluOSDiscovery {
     /**
      * Turn service instances into addressable endpoints.
      *
-     * A zone is only usable once its SRV record (for the port) and an IPv4 address
-     * are both known. The address comes from an A record when one was offered, and
-     * otherwise from the responder's own source address, which for a player
-     * advertising its own service is the same machine.
+     * A zone is only usable once its SRV record (for the port) and a local IPv4
+     * address are both known (RFC 1918, CGNAT / Tailscale, link-local). Public
+     * IPv4 and loopback are ignored, so an advertisement cannot point verify at
+     * Homebridge or at an off-network host. The address comes from an A record
+     * when one was offered, and otherwise from the responder's own source
+     * address, which for a player advertising its own service is the same machine.
      */
     toEndpoints(candidates) {
         const seen = new Set();
@@ -215,6 +218,13 @@ class BluOSDiscovery {
             const host = fromA ?? candidate.responder;
             if (host === undefined || !IPV4.test(host)) {
                 this.log.debug(`discovery: no IPv4 address for ${candidate.instance} (target ${candidate.target})`);
+                continue;
+            }
+            if (!(0, validators_1.isDiscoveryHost)(host)) {
+                const reason = (0, validators_1.isLoopbackIpv4)(host)
+                    ? 'loopback is not accepted from mDNS'
+                    : 'not a local address';
+                this.log.debug(`discovery: skipping ${host} (${reason})`);
                 continue;
             }
             const key = (0, identity_1.formatEndpoint)(host, candidate.port);

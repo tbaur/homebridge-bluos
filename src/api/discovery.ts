@@ -41,6 +41,7 @@ import {
 import type { DiscoveredPlayer, PluginLogger } from '../types'
 import { describeError } from '../utils/errors'
 import { interruptibleSleep } from '../utils/timing'
+import { isDiscoveryHost, isLoopbackIpv4 } from '../utils/validators'
 import type { BluOSClient, Endpoint } from './client'
 import { formatEndpoint, makePlayerId, parseMac } from './identity'
 
@@ -285,10 +286,12 @@ export class BluOSDiscovery {
   /**
    * Turn service instances into addressable endpoints.
    *
-   * A zone is only usable once its SRV record (for the port) and an IPv4 address
-   * are both known. The address comes from an A record when one was offered, and
-   * otherwise from the responder's own source address, which for a player
-   * advertising its own service is the same machine.
+   * A zone is only usable once its SRV record (for the port) and a local IPv4
+   * address are both known (RFC 1918, CGNAT / Tailscale, link-local). Public
+   * IPv4 and loopback are ignored, so an advertisement cannot point verify at
+   * Homebridge or at an off-network host. The address comes from an A record
+   * when one was offered, and otherwise from the responder's own source
+   * address, which for a player advertising its own service is the same machine.
    */
   private toEndpoints(candidates: {
     instances: Candidate[]
@@ -303,6 +306,13 @@ export class BluOSDiscovery {
         this.log.debug(
           `discovery: no IPv4 address for ${candidate.instance} (target ${candidate.target})`,
         )
+        continue
+      }
+      if (!isDiscoveryHost(host)) {
+        const reason = isLoopbackIpv4(host)
+          ? 'loopback is not accepted from mDNS'
+          : 'not a local address'
+        this.log.debug(`discovery: skipping ${host} (${reason})`)
         continue
       }
       const key = formatEndpoint(host, candidate.port)
