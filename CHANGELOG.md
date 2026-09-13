@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3](https://github.com/tbaur/homebridge-bluos/compare/v2.0.2...v2.0.3) (2026-09-13)
+
+
+### Bug Fixes
+
+* skip public and loopback addresses in mDNS discovery ([#46](https://github.com/tbaur/homebridge-bluos/issues/46)) ([9010b86](https://github.com/tbaur/homebridge-bluos/commit/9010b861a95f8d11e450c7c3d877f1f243c2f01d))
+
 ## [2.0.2](https://github.com/tbaur/homebridge-bluos/compare/v2.0.1...v2.0.2) (2026-09-10)
 
 
