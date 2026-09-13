@@ -60,7 +60,7 @@ Name it with `options.rebootAllName`. It is the one accessory with no room of it
 
 ## Reliability in detail
 
-**Discovery in the settings page.** Finds zones over mDNS and writes the configuration for you, including the stable identity the platform will look for. Manual address entry covers networks where multicast is filtered.
+**Discovery in the settings page.** Finds zones over mDNS and writes the configuration for you, including the stable identity the platform will look for. Only local IPv4 advertisements are verified (private, CGNAT/Tailscale, link-local). Public and loopback addresses are skipped. Manual address entry covers networks where multicast is filtered; the settings probe still allows loopback because you typed it.
 
 **Long-polling, not polling.** `/SyncStatus?timeout=100` with an `etag`, so a change made on the front panel, the remote or the BluOS app reaches HomeKit in about a second, without hammering the player. One poll loop per zone, because the etag is per zone and not per chassis.
 

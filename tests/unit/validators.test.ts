@@ -11,7 +11,9 @@
 
 import {
   forLog,
+  isDiscoveryHost,
   isIpv4,
+  isLoopbackIpv4,
   isNonPrivateIpv4,
   isProbeableHost,
   isValidHost,
@@ -150,6 +152,31 @@ describe('isProbeableHost', () => {
     ['not a string', 42, false],
   ])('%s', (_label, value, expected) => {
     expect(isProbeableHost(value)).toBe(expected)
+  })
+})
+
+describe('isLoopbackIpv4', () => {
+  it.each([
+    ['loopback', '127.0.0.1', true],
+    ['RFC 1918', '192.168.4.11', false],
+    ['hostname', 'bluesound.local', false],
+  ])('%s', (_label, value, expected) => {
+    expect(isLoopbackIpv4(value)).toBe(expected)
+  })
+})
+
+describe('isDiscoveryHost', () => {
+  it.each([
+    ['RFC 1918', '192.168.4.11', true],
+    ['CGNAT / Tailscale', '100.64.1.10', true],
+    ['link-local', '169.254.1.1', true],
+    ['loopback', '127.0.0.1', false],
+    ['public IPv4', '8.8.8.8', false],
+    ['documentation IPv4', '203.0.113.7', false],
+    ['.local hostname', 'bluesound.local', true],
+    ['empty', '', false],
+  ])('%s', (_label, value, expected) => {
+    expect(isDiscoveryHost(value)).toBe(expected)
   })
 })
 

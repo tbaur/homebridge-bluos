@@ -16,8 +16,8 @@ Do not open a public issue. Use GitHub's [private vulnerability reporting](https
 - **Input validation:** Config is checked at startup. A missing or non-list `devices` value disables the platform without unregistering accessories. A bad player or preset is skipped. Hosts, ports and timeouts are rejected or clamped.
 - **Log safety:** Values written to logs have control characters stripped and are length-limited.
 - **Bounded I/O:** Connect and total timeouts on every request, responses capped at 128 KiB, and XML parsed with size, depth and element caps.
-- **Discovery:** mDNS errors are caught so they cannot take Homebridge down. Browse results are capped.
-- **Settings probe:** Accepts only a private or local address and a documented BluOS port.
+- **Discovery:** mDNS errors are caught so they cannot take Homebridge down. Browse results are capped. Advertised addresses are verified only when they are local (RFC 1918, CGNAT/Tailscale, link-local). Public IPv4 and loopback are skipped, so an advertisement cannot make Homebridge open `/SyncStatus` on itself or on the public internet. Players already in configuration are unchanged.
+- **Settings probe:** Accepts only a private or local address and a documented BluOS port. Loopback is allowed here because an administrator asked for that probe.
 - **Dependencies:** CI runs `npm audit` on the runtime tree and OSV-Scanner on the full tree.
 
 ## Best Practices for Users

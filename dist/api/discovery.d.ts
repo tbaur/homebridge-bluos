@@ -112,10 +112,12 @@ export declare class BluOSDiscovery {
     /**
      * Turn service instances into addressable endpoints.
      *
-     * A zone is only usable once its SRV record (for the port) and an IPv4 address
-     * are both known. The address comes from an A record when one was offered, and
-     * otherwise from the responder's own source address, which for a player
-     * advertising its own service is the same machine.
+     * A zone is only usable once its SRV record (for the port) and a local IPv4
+     * address are both known (RFC 1918, CGNAT / Tailscale, link-local). Public
+     * IPv4 and loopback are ignored, so an advertisement cannot point verify at
+     * Homebridge or at an off-network host. The address comes from an A record
+     * when one was offered, and otherwise from the responder's own source
+     * address, which for a player advertising its own service is the same machine.
      */
     private toEndpoints;
     /** Collect mDNS records for the configured window. */

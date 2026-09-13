@@ -56,7 +56,7 @@ Nothing needs enabling on the player, because the BluOS LAN API is always on. A 
 
 ### 3. Configure
 
-**Homebridge UI** (recommended): open the plugin settings and press **Discover Players**. Every zone that answers is listed. Tick the players and accessories you want, then press the Homebridge Save button.
+**Homebridge UI** (recommended): open the plugin settings and press **Discover Players**. Every zone that answers on a local IPv4 address is listed. Public and loopback advertisements are skipped. Tick the players and accessories you want, then press the Homebridge Save button.
 
 Or in `config.json`:
 

@@ -324,6 +324,42 @@ describe('BluOSDiscovery', () => {
     expect(test.log.calls.some((line) => line.includes('no SRV record'))).toBe(true)
   })
 
+  it('does not verify a public IPv4 advertised over mDNS', async () => {
+    const session = new FakeMdns([{
+      remote: { address: '203.0.113.7' },
+      packet: {
+        answers: [ptr('_musc._tcp.local', ZONE_ONE)],
+        additionals: [
+          srv(ZONE_ONE, 'evil.local', 11_000),
+          a('evil.local', '203.0.113.7'),
+        ],
+      },
+    }])
+    const test = discovery(session, { '203.0.113.7:11000': SYNC_STATUS_CI_S2_ZONE_ONE })
+
+    await expect(discoverNow(test.instance)).resolves.toEqual([])
+    expect(test.asked).toEqual([])
+    expect(test.log.calls.some((line) => line.includes('not a local address'))).toBe(true)
+  })
+
+  it('does not verify a loopback address advertised over mDNS', async () => {
+    const session = new FakeMdns([{
+      remote: { address: '127.0.0.1' },
+      packet: {
+        answers: [ptr('_musc._tcp.local', ZONE_ONE)],
+        additionals: [
+          srv(ZONE_ONE, 'local-player.local', 11_000),
+          a('local-player.local', '127.0.0.1'),
+        ],
+      },
+    }])
+    const test = discovery(session, { '127.0.0.1:11000': SYNC_STATUS_CI_S2_ZONE_ONE })
+
+    await expect(discoverNow(test.instance)).resolves.toEqual([])
+    expect(test.asked).toEqual([])
+    expect(test.log.calls.some((line) => line.includes('loopback is not accepted from mDNS'))).toBe(true)
+  })
+
   it('does not offer a player that never answered /SyncStatus', async () => {
     const session = new FakeMdns(twoZoneChassis)
     const test = discovery(session, { '192.168.4.11:11000': SYNC_STATUS_CI_S2_ZONE_ONE })
