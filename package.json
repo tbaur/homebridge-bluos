@@ -58,7 +58,7 @@
     "globals": "^17.7.0",
     "homebridge": "^2.1.0",
     "jest": "^30.4.2",
-    "ts-jest": "29.4.12",
+    "ts-jest": "29.4.14",
     "typescript": "^6.0.3"
   },
   "engines": {
