@@ -146,6 +146,10 @@ The plugin talks only to the addresses in your configuration, on your LAN. There
 - [Report Issues](https://github.com/tbaur/homebridge-bluos/issues)
 - [Changelog](CHANGELOG.md)
 
+## Trademarks
+
+homebridge-bluos is an independent project. It is not affiliated with or endorsed by Bluesound, NAD, or Lenbrook. BluOS, Bluesound, and NAD are trademarks of Lenbrook Industries Limited.
+
 ## License
 
 Copyright 2026 tbaur
