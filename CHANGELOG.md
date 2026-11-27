@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.5](https://github.com/tbaur/homebridge-bluos/compare/v2.0.4...v2.0.5) (2026-11-27)
+
+
+### Bug Fixes
+
+* bump @homebridge/plugin-ui-utils from 2.2.7 to 2.3.0 ([#70](https://github.com/tbaur/homebridge-bluos/issues/70)) ([c663061](https://github.com/tbaur/homebridge-bluos/commit/c663061eb06a5d16f9c2134c9daff4c1b313e763))
+
 ## [2.0.4](https://github.com/tbaur/homebridge-bluos/compare/v2.0.3...v2.0.4) (2026-11-07)
 
 
