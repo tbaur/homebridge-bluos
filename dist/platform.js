@@ -613,7 +613,7 @@ class BluOSPlatform {
      * Accessory Information is left alone so the tile keeps its name and model.
      */
     markAccessoryUnavailable(accessory) {
-        const failure = new this.hap.HapStatusError(-70402 /* this.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE */);
+        const failure = new this.hap.HapStatusError(this.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
         for (const service of accessory.services) {
             if (service.UUID === this.hap.Service.AccessoryInformation.UUID) {
                 continue;

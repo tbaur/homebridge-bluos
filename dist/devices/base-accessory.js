@@ -100,7 +100,7 @@ class BaseAccessory {
      * Response, which is the honest answer before the first successful poll.
      */
     communicationFailure() {
-        return new this.host.hap.HapStatusError(-70402 /* this.host.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE */);
+        return new this.host.hap.HapStatusError(this.host.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
     }
     /** Throw if this accessory has no observed state to report. */
     requireObservedState() {
